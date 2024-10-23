@@ -1,0 +1,40 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: voluseg-worker-scaledobject
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: voluseg-worker
+    kind: Deployment
+  pollingInterval: 15
+  cooldownPeriod: 30
+  maxReplicaCount: 20
+  minReplicaCount: 0
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: REDIS_HOST
+        portFromEnv: REDIS_PORT
+        tls: enable
+        ca: ca
+        cert: cert
+        key: key
+      authenticationRef:
+        name: redis-trigger-auth
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: redis-trigger-auth
+spec:
+  secretTargetRef:
+  - parameter: cert
+    name: celery-redis-tls-secret
+    key: redis.crt
+  - parameter: key
+    name: celery-redis-tls-secret
+    key: redis.key
+  - parameter: ca
+    name: celery-redis-tls-secret
+    key: ca.crt

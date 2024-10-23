@@ -1,0 +1,42 @@
+FROM python:3.11-bullseye
+
+# Install git and Java
+RUN apt-get update && apt-get install -y git cmake openjdk-11-jdk
+RUN rm -rf /var/lib/apt/lists/*
+
+# Build ANTs
+RUN git clone https://github.com/ANTsX/ANTs.git
+RUN mkdir -p /ANTs/build
+WORKDIR /ANTs/build
+
+RUN cmake \
+    -DBUILD_TESTING=OFF \
+    -DRUN_LONG_TESTS=OFF \
+    -DRUN_SHORT_TESTS=OFF \
+    ..
+RUN make -j 
+WORKDIR ANTS-build
+RUN make install
+RUN rm -rf /ANTs
+
+# Install Python packages
+RUN pip install \
+    h5py \
+    matplotlib \
+    nibabel \
+    numpy \
+    pandas \
+    scipy \
+    scikit-image \
+    scikit-learn \
+    pyspark \
+    tifftools \
+    git+https://github.com/mikarubi/voluseg.git \
+    findspark \
+    boto3 \
+    celery[redis]
+
+COPY worker /worker
+
+WORKDIR /worker
+ENTRYPOINT [ "/usr/local/bin/celery", "-A", "worker", "worker", "-P", "solo", "--loglevel=info", "-Q", "tasks" ]
