@@ -1,0 +1,13 @@
+h5py
+matplotlib
+nibabel
+numpy
+pandas
+scipy
+scikit-image
+scikit-learn
+pyspark
+tifftools
+git+https://github.com/mikarubi/voluseg.git
+findspark
+flask
