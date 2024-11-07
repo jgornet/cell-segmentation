@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voluseg Data Processing - Uploaded Files</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            margin-top: 50px;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">Uploaded Files</h2>
+                {% if files %}
+                    <ul class="list-group">
+                    {% for file in files %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ file }}
+                            <a href="{{ url_for('download_uploaded_file', filename=file) }}" class="btn btn-sm btn-outline-primary">Download</a>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-center">No files have been uploaded yet.</p>
+                {% endif %}
+                <div class="mt-4">
+                    <a href="{{ url_for('upload_form') }}" class="btn btn-outline-secondary btn-sm mr-2">Upload New File</a>
+                    <a href="{{ url_for('list_files') }}" class="btn btn-outline-info btn-sm">View Processed Files</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

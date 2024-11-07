@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voluseg Data Processing - Upload File</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 800px;
+            margin-top: 50px;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        .progress {
+            height: 25px;
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">Voluseg Data Processing - Upload File</h2>
+                <form id="upload-form" method="post" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" id="file-input" name="file" required>
+                            <label class="custom-file-label" for="file-input">Choose file</label>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block">Upload</button>
+                </form>
+                <div class="progress mt-3" style="display: none;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+                <div class="mt-4">
+                    <a href="{{ url_for('list_files') }}" class="btn btn-outline-secondary btn-sm mr-2">View Processed Files</a>
+                    <a href="{{ url_for('get_status') }}" class="btn btn-outline-info btn-sm">View Processing Status</a>
+                    <a href="{{ url_for('list_uploaded_files') }}" class="btn btn-outline-primary btn-sm">View Uploaded Files</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bs-custom-file-input/dist/bs-custom-file-input.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            bsCustomFileInput.init()
+
+            $('#upload-form').on('submit', function(e) {
+                e.preventDefault();
+                var fileInput = document.getElementById('file-input');
+                var file = fileInput.files[0];
+                var formData = new FormData();
+                formData.append('file', file);
+
+                $.ajax({
+                    xhr: function() {
+                        var xhr = new window.XMLHttpRequest();
+                        xhr.upload.addEventListener("progress", function(evt) {
+                            if (evt.lengthComputable) {
+                                var percentComplete = evt.loaded / evt.total;
+                                percentComplete = parseInt(percentComplete * 100);
+                                $('.progress').show();
+                                $('.progress-bar').width(percentComplete + '%');
+                                $('.progress-bar').text(percentComplete + '%');
+                            }
+                        }, false);
+                        return xhr;
+                    },
+                    url: "{{ url_for('upload_file') }}",
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(data) {
+                        alert('Upload successful, data put into processing queue');
+                        //window.location.href = "{{ url_for('list_files') }}";
+                    },
+                    error: function() {
+                        alert('An error occurred during the upload');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
