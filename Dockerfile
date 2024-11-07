@@ -39,4 +39,4 @@ RUN pip install \
 COPY worker /worker
 
 WORKDIR /worker
-ENTRYPOINT [ "/usr/local/bin/celery", "-A", "worker", "worker", "-P", "solo", "--loglevel=info", "-Q", "tasks" ]
+ENTRYPOINT [ "/usr/local/bin/celery", "-A", "worker", "worker", "-P", "solo", "-c", "1", "--loglevel=info", "-Q", "tasks" ]

@@ -24,7 +24,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: voluseg-worker
-        image: gornet/voluseg-worker:0.0.9
+        image: gornet/voluseg-worker:0.0.22
         env:
         - name: S3_ACCESS_KEY_ID
           valueFrom:
@@ -40,6 +40,8 @@ spec:
           value: "redis-tls-service"
         - name: REDIS_PORT
           value: "6379"
+        - name: RABBITMQ_URL
+          value: "amqp://guest:guest@rabbitmq-service:5672/celery_vhost"
         volumeMounts:
         - name: redis-tls
           mountPath: /etc/redis/tls
@@ -71,14 +73,14 @@ spec:
   scaleTargetRef:
     name: voluseg-worker
     kind: Deployment
-  pollingInterval: 15
-  cooldownPeriod: 30
+  pollingInterval: 30
+  cooldownPeriod: 300
   maxReplicaCount: 20
   minReplicaCount: 0
   triggers:
-    - type: redis
+    - type: rabbitmq
       metadata:
-        host: "redis-service.default.svc.cluster.local"
-        port: "6380"
-        listName: "tasks"
-        listLength: "1"
+        host: "amqp://guest:guest@rabbitmq-service.default.svc.cluster.local:5672/celery_vhost"
+        queueName: "tasks"
+        mode: "QueueLength"
+        value: "5"

@@ -15,31 +15,28 @@ from pyspark.sql import SparkSession
 
 from config import celery
 
-logging.basicConfig(level=logging.INFO)
-
 
 @celery.task()
 def process_volume(url):
     download_url = url
 
-    logger.getLogger("voluseg").setLevel(logging.INFO)
-    logger.info(f"Downloading {download_url}")
+    print(f"Downloading {download_url}")
     download_tif(download_url)
-    logger.info(f"Downloaded {download_url}")
+    print(f"Downloaded {download_url}")
 
-    logger.info("Converting tif to h5")
+    print("Converting tif to h5")
     tif_to_h5("/data/input.tif")
-    logger.info("Converted tif to h5")
+    print("Converted tif to h5")
 
-    logger.info("Generating traces")
+    print("Generating traces")
     generate_traces()
-    logger.info("Generated traces")
+    print("Generated traces")
 
-    logger.info("Uploading traces")
+    print("Uploading traces")
     fn = os.path.splitext(url)[0]
     upload_url = f"{fn}.hdf5"
     upload_traces(upload_url)
-    logger.info("Uploaded traces")
+    print("Uploaded traces")
 
     clean_directory()
 
@@ -66,10 +63,10 @@ def download_tif(url: str):
         aws_access_key_id=os.environ["S3_ACCESS_KEY_ID"],
         aws_secret_access_key=os.environ["S3_SECRET_ACCESS_KEY"],
     )
-    logger.info(f"Downloading {url}")
+    print(f"Downloading {url}")
     bucket = s3.Bucket("voluseg-input")
     bucket.download_file(url, "/data/input.tif")
-    logger.info(f"Downloaded {url}")
+    print(f"Downloaded {url}")
 
 
 def tif_to_h5(tif_path):
