@@ -23,11 +23,37 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: http-loadbalancer
+  name: webserver
 spec:
-  type: LoadBalancer
   ports:
-    - port: 80
-      targetPort: 5000
+  - port: 80
+    targetPort: 5000
+    protocol: TCP
   selector:
     app: webserver
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kuard
+  annotations:
+    cert-manager.io/issuer: "letsencrypt-prod"
+
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - cell-segmentation.jamesgornet.com
+    secretName: cell-segmentation-tls
+  rules:
+  - host: cell-segmentation.jamesgornet.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: webserver
+            port:
+              number: 80
+            
