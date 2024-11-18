@@ -17,6 +17,8 @@ spec:
       containers:
       - name: webserver
         image: ghcr.io/jgornet/cell-segmentation/webserver
+        ports:
+        - containerPort: 5000
       imagePullSecrets:
       - name: regcred
 ---
@@ -27,7 +29,7 @@ metadata:
 spec:
   ports:
   - port: 80
-    targetPort: 80
+    targetPort: 5000
     protocol: TCP
   selector:
     app: webserver
