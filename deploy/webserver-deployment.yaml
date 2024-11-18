@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: webserver
-        image: ghcr.io/jgornet/cell-segmentation/webserver
+        image: ghcr.io/jgornet/cell-segmentation/cell-segmentation-webserver
         ports:
         - containerPort: 5000
       imagePullSecrets:

@@ -66,6 +66,6 @@ jobs:
           manifests: |
             deploy/webserver-deployment.yaml
           images: |
-            ghcr.io/jgornet/cell-segmentation/webserver:${{ github.sha }}
+            ghcr.io/jgornet/cell-segmentation/cell-segmentation-webserver:${{ github.sha }}
           pull-images: false # don't try to annotate deployments
           namespace: default
