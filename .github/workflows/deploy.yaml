@@ -43,8 +43,8 @@ jobs:
       - name: Build and Push Worker
         uses: docker/build-push-action@v4
         with:
-          context: ./workers
-          file: ./workers/Dockerfile.${{ matrix.worker }}
+          context: .
+          file: ./Dockerfile.${{ matrix.worker }}
           push: true
           tags: |
             ${{ steps.docker_meta.outputs.tags }}
