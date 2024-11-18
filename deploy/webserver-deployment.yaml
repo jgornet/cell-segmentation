@@ -16,16 +16,6 @@ spec:
     spec:
       containers:
       - name: webserver
-        image: gornet/webserver:0.0.1
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: http-loadbalancer
-spec:
-  type: LoadBalancer
-  ports:
-    - port: 80
-      targetPort: 80
-  selector:
-    app: webserver
+        image: ghcr.io/jgornet/cell-segmentation/webserver
+      imagePullSecrets:
+      - name: regcred

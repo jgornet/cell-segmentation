@@ -15,6 +15,8 @@ spec:
       labels:
         app: voluseg-worker
     spec:
+      imagePullSecrets:
+      - name: regcred
       nodeSelector:
         "kops.k8s.io/instancegroup": "spotgroup"
       tolerations:
@@ -24,7 +26,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: voluseg-worker
-        image: gornet/voluseg-worker:0.0.22
+        image: ghcr.io/jgornet/cell-segmentation/worker
         env:
         - name: S3_ACCESS_KEY_ID
           valueFrom:
