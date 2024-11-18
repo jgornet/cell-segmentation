@@ -26,7 +26,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: voluseg-worker
-        image: ghcr.io/jgornet/cell-segmentation/worker
+        image: gornet/voluseg-worker:0.0.22
         env:
         - name: S3_ACCESS_KEY_ID
           valueFrom:

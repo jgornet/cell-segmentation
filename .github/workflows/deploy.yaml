@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'worker/**'
+      - 'Dockerfile.webserver'
       - 'website/**'
       - '.github/workflows/deploy.yaml'
   workflow_dispatch:
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        worker: [webserver, worker]
+        worker: [webserver]
     permissions:
       contents: read
       packages: write
@@ -65,9 +65,7 @@ jobs:
         with:
           manifests: |
             deploy/webserver-deployment.yaml
-            deploy/worker-deployment.yaml
           images: |
             ghcr.io/jgornet/cell-segmentation/webserver:${{ github.sha }}
-            ghcr.io/jgornet/cell-segmentation/worker:${{ github.sha }}
           pull-images: false # don't try to annotate deployments
           namespace: default
