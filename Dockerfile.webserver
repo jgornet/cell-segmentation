@@ -23,7 +23,6 @@ RUN pip install \
     redis
 
 COPY website /website
-COPY config.py /website/config.py
 
 WORKDIR /website
 ENTRYPOINT [ "/usr/local/bin/flask", "--app", "hello", "run", "--host=0.0.0.0" ]
