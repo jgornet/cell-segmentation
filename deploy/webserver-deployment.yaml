@@ -65,6 +65,7 @@ metadata:
   name: webserver
   annotations:
     cert-manager.io/issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100G"
 spec:
   ingressClassName: nginx
   tls:

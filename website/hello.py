@@ -23,8 +23,6 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-
-
 # Configuration
 app.config['S3_BUCKET_INPUT'] = os.environ.get('S3_BUCKET_INPUT', 'voluseg-input')
 app.config['S3_BUCKET_OUTPUT'] = os.environ.get('S3_BUCKET_OUTPUT', 'voluseg-output')
