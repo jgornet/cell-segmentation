@@ -19,6 +19,31 @@ spec:
         image: ghcr.io/jgornet/cell-segmentation/cell-segmentation-webserver
         ports:
         - containerPort: 5000
+        env:
+        - name: S3_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-s3-secret
+              key: S3_ACCESS_KEY_ID
+        - name: S3_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-s3-secret
+              key: S3_SECRET_ACCESS_KEY
+        - name: REDIS_HOST
+          value: "redis-tls-service"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: RABBITMQ_URL
+          value: "amqp://guest:guest@rabbitmq-service:5672/celery_vhost"
+        volumeMounts:
+        - name: redis-tls
+          mountPath: /etc/redis/tls
+          readOnly: true
+      volumes:
+      - name: redis-tls
+        secret:
+          secretName: celery-redis-tls-secret
       imagePullSecrets:
       - name: regcred
 ---
@@ -40,7 +65,6 @@ metadata:
   name: webserver
   annotations:
     cert-manager.io/issuer: "letsencrypt-prod"
-
 spec:
   ingressClassName: nginx
   tls:

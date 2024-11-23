@@ -14,7 +14,7 @@ spec:
     metadata:
       labels:
         app: voluseg-worker
-    spec:
+    spec:60Gi
       imagePullSecrets:
       - name: regcred
       nodeSelector:
