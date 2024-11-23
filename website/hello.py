@@ -2,6 +2,7 @@
 
 import os
 import logging
+import traceback
 from flask import Flask, request, render_template, send_file, abort, jsonify, url_for
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -12,10 +13,6 @@ import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 from celery import Celery
 import time
-
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
@@ -43,7 +40,6 @@ try:
         aws_secret_access_key=os.environ.get('AWS_SECRET_ACCESS_KEY')
     )
 except NoCredentialsError:
-    logger.error("No AWS credentials found. Make sure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are set.")
     s3 = None
 
 # User credentials (replace with your own secure method)
@@ -85,13 +81,10 @@ def upload_file():
             task = celery.send_task('worker.process_volume', args=[filename])
             return jsonify({'success': True, 'message': 'File uploaded and queued for processing', 'task_id': task.id})
         except ClientError as e:
-            logger.error(f"S3 upload error: {str(e)}")
             return jsonify({'error': f'S3 upload error: {str(e)}'}), 500
         except Exception as e:
-            logger.error(f"Unexpected error during file upload: {str(e)}")
-            return jsonify({'error': 'An unexpected error occurred during file upload'}), 500
+            return jsonify({'error': f'Unexpected error during file upload: {str(e)}'}), 500
     else:
-        logger.error("S3 client not initialized or file upload failed")
         return jsonify({'error': 'S3 client not initialized or file upload failed'}), 500
 
 @app.route('/status/<task_id>')
@@ -121,8 +114,7 @@ def get_status(task_id):
 @limiter.limit("10 per minute")
 def list_files():
     if not s3:
-        logger.error("S3 client not initialized")
-        return jsonify({'error': 'S3 client not initialized'}), 500
+        return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
     
     try:
         input_files = s3.list_objects_v2(Bucket=app.config['S3_BUCKET_INPUT'])
@@ -133,19 +125,16 @@ def list_files():
         
         return render_template('files.html', input_files=input_files, output_files=output_files)
     except ClientError as e:
-        logger.error(f"S3 list error: {str(e)}")
         return jsonify({'error': f'S3 list error: {str(e)}'}), 500
     except Exception as e:
-        logger.error(f"Unexpected error while listing files: {str(e)}")
-        return jsonify({'error': 'An unexpected error occurred while listing files'}), 500
+        return jsonify({'error': f'Unexpected error while listing files: {str(e)}\n{traceback.format_exc()}'}), 500
 
 @app.route('/download/<filename>')
 @auth.login_required
 @limiter.limit("10 per minute")
 def download_file(filename):
     if not s3:
-        logger.error("S3 client not initialized")
-        return jsonify({'error': 'S3 client not initialized'}), 500
+        return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
     
     try:
         file = s3.get_object(Bucket=app.config['S3_BUCKET_OUTPUT'], Key=filename)
@@ -156,19 +145,15 @@ def download_file(filename):
         )
     except ClientError as e:
         if e.response['Error']['Code'] == "NoSuchKey":
-            logger.error(f"File not found: {filename}")
             abort(404)
         else:
-            logger.error(f"S3 download error: {str(e)}")
             return jsonify({'error': f'S3 download error: {str(e)}'}), 500
     except Exception as e:
-        logger.error(f"Unexpected error during file download: {str(e)}")
-        return jsonify({'error': 'An unexpected error occurred during file download'}), 500
+        return jsonify({'error': f'Unexpected error during file download: {str(e)}'}), 500
 
 @app.errorhandler(500)
 def internal_server_error(error):
-    logger.error(f"Internal Server Error: {str(error)}")
-    return jsonify({'error': 'Internal Server Error'}), 500
+    return jsonify({'error': f'Internal Server Error: {str(error)}\n{traceback.format_exc()}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)

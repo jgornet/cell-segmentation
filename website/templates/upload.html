@@ -22,6 +22,7 @@
                     <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
                 <div id="status" class="mt-3"></div>
+                <div id="error" class="mt-3 text-danger"></div>
                 <div class="mt-4">
                     <a href="{{ url_for('list_files') }}" class="btn btn-outline-secondary btn-sm">View Files</a>
                 </div>
@@ -61,10 +62,12 @@
                     contentType: false,
                     success: function(data) {
                         $('#status').html('Upload successful, processing started. Task ID: ' + data.task_id);
+                        $('#error').html('');
                         checkStatus(data.task_id);
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
-                        $('#status').html('An error occurred during the upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
+                        $('#status').html('');
+                        $('#error').html('An error occurred during the upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
                     }
                 });
             });
@@ -78,7 +81,7 @@
                         }, 5000);
                     }
                 }).fail(function(jqXHR, textStatus, errorThrown) {
-                    $('#status').html('Error checking status: ' + errorThrown);
+                    $('#error').html('Error checking status: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
                 });
             }
         });
