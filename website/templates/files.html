@@ -17,10 +17,19 @@
         <div class="card">
             <div class="card-body">
                 <h2 class="card-title text-center mb-4">Files</h2>
+                <div id="error" class="alert alert-danger" style="display: none;"></div>
                 <h3>Input Files</h3>
                 <ul class="list-group mb-4">
                     {% for file in input_files %}
-                        <li class="list-group-item">{{ file }}</li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ file }}
+                            <span>
+                                <span class="badge badge-{{ 'success' if file_status[file] == 'Completed' else 'warning' if file_status[file] == 'Processing' else 'danger' if file_status[file] == 'Failed' else 'secondary' }}">
+                                    {{ file_status[file] }}
+                                </span>
+                                <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_INPUT'], filename=file) }}" class="btn btn-sm btn-primary ml-2">Download</a>
+                            </span>
+                        </li>
                     {% endfor %}
                 </ul>
                 <h3>Output Files</h3>
@@ -28,7 +37,7 @@
                     {% for file in output_files %}
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             {{ file }}
-                            <a href="{{ url_for('download_file', filename=file) }}" class="btn btn-sm btn-primary">Download</a>
+                            <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_OUTPUT'], filename=file) }}" class="btn btn-sm btn-primary">Download</a>
                         </li>
                     {% endfor %}
                 </ul>
@@ -38,5 +47,15 @@
             </div>
         </div>
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            var errorMessage = "{{ error }}";
+            if (errorMessage) {
+                $('#error').text(errorMessage).show();
+            }
+        });
+    </script>
 </body>
 </html>

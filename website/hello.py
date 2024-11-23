@@ -13,6 +13,7 @@ import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 from celery import Celery
 import time
+from io import BytesIO
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
@@ -77,7 +78,7 @@ def upload_file():
     if file and s3:
         filename = secure_filename(file.filename)
         try:
-            s3.upload_fileobj(file, app.config['S3_BUCKET_INPUT'], filename)
+            s3.Bucket(app.config['S3_BUCKET_INPUT']).upload_fileobj(file, filename)
             # Enqueue processing task
             task = celery.send_task('worker.process_volume', args=[filename])
             return jsonify({'success': True, 'message': 'File uploaded and queued for processing', 'task_id': task.id})
@@ -124,25 +125,46 @@ def list_files():
         input_files = [obj.key for obj in input_bucket.objects.all()]
         output_files = [obj.key for obj in output_bucket.objects.all()]
         
-        return render_template('files.html', input_files=input_files, output_files=output_files)
+        # Get processing status for input files
+        file_status = {}
+        for filename in input_files:
+            task = celery.AsyncResult(filename)
+            if task.state == 'PENDING':
+                file_status[filename] = 'Pending'
+            elif task.state == 'SUCCESS':
+                file_status[filename] = 'Completed'
+            elif task.state == 'FAILURE':
+                file_status[filename] = 'Failed'
+            else:
+                file_status[filename] = 'Processing'
+        
+        return render_template('files.html', input_files=input_files, output_files=output_files, file_status=file_status)
     except ClientError as e:
         return jsonify({'error': f'S3 list error: {str(e)}'}), 500
     except Exception as e:
         return jsonify({'error': f'Unexpected error while listing files: {str(e)}\n{traceback.format_exc()}'}), 500
 
-@app.route('/download/<filename>')
+@app.route('/download/<bucket>/<filename>')
 @auth.login_required
 @limiter.limit("10 per minute")
-def download_file(filename):
+def download_file(bucket, filename):
     if not s3:
         return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
     
     try:
-        file = s3.get_object(Bucket=app.config['S3_BUCKET_OUTPUT'], Key=filename)
+        if bucket not in [app.config['S3_BUCKET_INPUT'], app.config['S3_BUCKET_OUTPUT']]:
+            abort(404)
+        
+        file_obj = s3.Object(bucket, filename)
+        file_stream = BytesIO()
+        file_obj.download_fileobj(file_stream)
+        file_stream.seek(0)
+        
         return send_file(
-            file['Body'],
+            file_stream,
             as_attachment=True,
-            attachment_filename=filename
+            attachment_filename=filename,
+            mimetype='application/octet-stream'
         )
     except ClientError as e:
         if e.response['Error']['Code'] == "NoSuchKey":
