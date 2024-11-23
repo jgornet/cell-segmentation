@@ -1,10 +1,49 @@
+# FROM python:3.11-bullseye
+
+# # Install Python packages
+# RUN pip install \
+#     flask
+
+# COPY website /website
+
+# WORKDIR /website
+# ENTRYPOINT [ "/usr/local/bin/flask", "--app", "hello", "run", "--host=0.0.0.0" ]
+
+# Dockerfile.webserver
+
 FROM python:3.11-bullseye
 
 # Install Python packages
 RUN pip install \
-    flask
+    flask \
+    flask-httpauth \
+    flask-limiter \
+    boto3 \
+    celery[redis] \
+    redis
 
 COPY website /website
+COPY config.py /website/config.py
 
 WORKDIR /website
 ENTRYPOINT [ "/usr/local/bin/flask", "--app", "hello", "run", "--host=0.0.0.0" ]
+
+
+# # Dockerfile.webserver
+
+# FROM python:3.11-bullseye
+
+# # Install Python packages
+# RUN pip install \
+#     flask \
+#     flask-httpauth \
+#     flask-limiter \
+#     boto3 \
+#     celery[redis] \
+#     redis
+
+# COPY website /website
+# COPY config.py /website/config.py
+
+# WORKDIR /website
+# ENTRYPOINT [ "python", "hello.py" ]
