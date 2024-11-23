@@ -115,14 +115,14 @@ def get_status(task_id):
 @limiter.limit("10 per minute")
 def list_files():
     if not s3:
-        return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
+        return jsonify({'error': 'S3 resource not initialized. Check AWS credentials.'}), 500
     
     try:
-        input_files = s3.list_objects_v2(Bucket=app.config['S3_BUCKET_INPUT'])
-        output_files = s3.list_objects_v2(Bucket=app.config['S3_BUCKET_OUTPUT'])
+        input_bucket = s3.Bucket(app.config['S3_BUCKET_INPUT'])
+        output_bucket = s3.Bucket(app.config['S3_BUCKET_OUTPUT'])
         
-        input_files = [obj['Key'] for obj in input_files.get('Contents', [])]
-        output_files = [obj['Key'] for obj in output_files.get('Contents', [])]
+        input_files = [obj.key for obj in input_bucket.objects.all()]
+        output_files = [obj.key for obj in output_bucket.objects.all()]
         
         return render_template('files.html', input_files=input_files, output_files=output_files)
     except ClientError as e:
