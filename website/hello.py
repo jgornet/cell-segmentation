@@ -14,6 +14,7 @@ from botocore.exceptions import ClientError, NoCredentialsError
 from celery import Celery
 import time
 from io import BytesIO
+import uuid
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
@@ -34,15 +35,21 @@ app.config['CELERY_RESULT_BACKEND'] = os.environ.get('REDIS_URL', 'redis://redis
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
 celery.conf.update(app.config)
 
-# S3 client
+# S3 client and resource
 try:
-    s3 = boto3.resource(
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=os.environ["S3_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["S3_SECRET_ACCESS_KEY"],
+    )
+    s3_resource = boto3.resource(
         "s3",
         aws_access_key_id=os.environ["S3_ACCESS_KEY_ID"],
         aws_secret_access_key=os.environ["S3_SECRET_ACCESS_KEY"],
     )
 except NoCredentialsError:
-    s3 = None
+    s3_client = None
+    s3_resource = None
 
 # User credentials (replace with your own secure method)
 users = {
@@ -66,28 +73,48 @@ def auth_error(status):
 def upload_form():
     return render_template('upload.html')
 
-@app.route('/upload', methods=['POST'])
+@app.route('/get_upload_url', methods=['POST'])
 @auth.login_required
 @limiter.limit("10 per minute")
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({'error': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'error': 'No selected file'}), 400
-    if file and s3:
-        filename = secure_filename(file.filename)
-        try:
-            s3.Bucket(app.config['S3_BUCKET_INPUT']).upload_fileobj(file, filename)
-            # Enqueue processing task
-            task = celery.send_task('worker.process_volume', args=[filename])
-            return jsonify({'success': True, 'message': 'File uploaded and queued for processing', 'task_id': task.id})
-        except ClientError as e:
-            return jsonify({'error': f'S3 upload error: {str(e)}'}), 500
-        except Exception as e:
-            return jsonify({'error': f'Unexpected error during file upload: {str(e)}'}), 500
-    else:
-        return jsonify({'error': 'S3 client not initialized or file upload failed'}), 500
+def get_upload_url():
+    if not s3_client:
+        return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
+
+    file_name = request.json.get('fileName')
+    if not file_name:
+        return jsonify({'error': 'No file name provided'}), 400
+
+    # Generate a unique file name to avoid overwrites
+    unique_filename = f"{uuid.uuid4()}-{secure_filename(file_name)}"
+
+    try:
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': app.config['S3_BUCKET_INPUT'],
+                'Key': unique_filename,
+                'ContentType': request.json.get('contentType', 'application/octet-stream')
+            },
+            ExpiresIn=3600  # URL expires in 1 hour
+        )
+        return jsonify({
+            'uploadUrl': presigned_url,
+            'fileName': unique_filename
+        })
+    except ClientError as e:
+        return jsonify({'error': f'Error generating pre-signed URL: {str(e)}'}), 500
+
+@app.route('/complete_upload', methods=['POST'])
+@auth.login_required
+@limiter.limit("10 per minute")
+def complete_upload():
+    filename = request.json.get('fileName')
+    if not filename:
+        return jsonify({'error': 'No file name provided'}), 400
+
+    # Enqueue processing task
+    task = celery.send_task('worker.process_volume', args=[filename])
+    return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
 
 @app.route('/status/<task_id>')
 @auth.login_required
@@ -115,12 +142,12 @@ def get_status(task_id):
 @auth.login_required
 @limiter.limit("10 per minute")
 def list_files():
-    if not s3:
+    if not s3_resource:
         return jsonify({'error': 'S3 resource not initialized. Check AWS credentials.'}), 500
     
     try:
-        input_bucket = s3.Bucket(app.config['S3_BUCKET_INPUT'])
-        output_bucket = s3.Bucket(app.config['S3_BUCKET_OUTPUT'])
+        input_bucket = s3_resource.Bucket(app.config['S3_BUCKET_INPUT'])
+        output_bucket = s3_resource.Bucket(app.config['S3_BUCKET_OUTPUT'])
         
         input_files = [obj.key for obj in input_bucket.objects.all()]
         output_files = [obj.key for obj in output_bucket.objects.all()]
@@ -148,14 +175,14 @@ def list_files():
 @auth.login_required
 @limiter.limit("10 per minute")
 def download_file(bucket, filename):
-    if not s3:
+    if not s3_resource:
         return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
     
     try:
         if bucket not in [app.config['S3_BUCKET_INPUT'], app.config['S3_BUCKET_OUTPUT']]:
             abort(404)
         
-        file_obj = s3.Object(bucket, filename)
+        file_obj = s3_resource.Object(bucket, filename)
         file_stream = BytesIO()
         file_obj.download_fileobj(file_stream)
         file_stream.seek(0)

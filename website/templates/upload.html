@@ -9,10 +9,10 @@
         <div class="card">
             <div class="card-body">
                 <h2 class="card-title text-center mb-4">Voluseg Data Processing - Upload File</h2>
-                <form id="upload-form" method="post" action="{{ url_for('upload_file') }}" enctype="multipart/form-data">
+                <form id="upload-form">
                     <div class="form-group">
                         <div class="custom-file">
-                            <input type="file" class="custom-file-input" id="file-input" name="file" required>
+                            <input type="file" class="custom-file-input" id="file-input" required>
                             <label class="custom-file-label" for="file-input">Choose file</label>
                         </div>
                     </div>
@@ -39,38 +39,75 @@
 
             $('#upload-form').on('submit', function(e) {
                 e.preventDefault();
-                var formData = new FormData(this);
+                var file = document.getElementById('file-input').files[0];
+                if (!file) {
+                    $('#error').html('Please select a file to upload.');
+                    return;
+                }
 
+                // Get the pre-signed URL
+                $.ajax({
+                    url: "{{ url_for('get_upload_url') }}",
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        fileName: file.name,
+                        contentType: file.type
+                    }),
+                    success: function(data) {
+                        uploadToS3(file, data.uploadUrl, data.fileName);
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        $('#error').html('Error getting upload URL: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
+                    }
+                });
+            });
+
+            function uploadToS3(file, presignedUrl, fileName) {
+                $('.progress').show();
+                
                 $.ajax({
                     xhr: function() {
                         var xhr = new window.XMLHttpRequest();
                         xhr.upload.addEventListener("progress", function(evt) {
                             if (evt.lengthComputable) {
-                                var percentComplete = evt.loaded / evt.total;
-                                percentComplete = parseInt(percentComplete * 100);
-                                $('.progress').show();
+                                var percentComplete = evt.loaded / evt.total * 100;
                                 $('.progress-bar').width(percentComplete + '%');
-                                $('.progress-bar').text(percentComplete + '%');
+                                $('.progress-bar').text(percentComplete.toFixed(2) + '%');
                             }
                         }, false);
                         return xhr;
                     },
-                    url: "{{ url_for('upload_file') }}",
-                    type: 'POST',
-                    data: formData,
+                    url: presignedUrl,
+                    type: 'PUT',
+                    data: file,
                     processData: false,
-                    contentType: false,
+                    contentType: file.type,
+                    success: function() {
+                        completeUpload(fileName);
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        $('#error').html('Error uploading to S3: ' + errorThrown);
+                    }
+                });
+            }
+
+            function completeUpload(fileName) {
+                $.ajax({
+                    url: "{{ url_for('complete_upload') }}",
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({fileName: fileName}),
                     success: function(data) {
                         $('#status').html('Upload successful, processing started. Task ID: ' + data.task_id);
                         $('#error').html('');
                         checkStatus(data.task_id);
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
-                        $('#status').html('');
-                        $('#error').html('An error occurred during the upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
+                        $('#error').html('Error completing upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
                     }
                 });
-            });
+            }
 
             function checkStatus(taskId) {
                 $.get("{{ url_for('get_status', task_id='') }}" + taskId, function(data) {
@@ -81,7 +118,7 @@
                         }, 5000);
                     }
                 }).fail(function(jqXHR, textStatus, errorThrown) {
-                    $('#error').html('Error checking status: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
+                    $('#error').html('Error checking status: ' + errorThrown);
                 });
             }
         });
