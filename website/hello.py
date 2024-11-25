@@ -89,6 +89,7 @@ def get_upload_url():
     unique_filename = f"{uuid.uuid4()}-{secure_filename(file_name)}"
 
     try:
+<<<<<<< HEAD
         presigned_post = s3_client.generate_presigned_post(
             Bucket=app.config['S3_BUCKET_INPUT'],
             Key=unique_filename,
@@ -97,6 +98,16 @@ def get_upload_url():
                 {"Content-Type": content_type}
             ],
             ExpiresIn=3600
+=======
+        presigned_url = s3_client.generate_presigned_url(
+            'put_object',
+            Params={
+                'Bucket': app.config['S3_BUCKET_INPUT'],
+                'Key': unique_filename,
+                'ContentType': "image/tiff"  # Only upload TIFF files
+            },
+            ExpiresIn=3600  # URL expires in 1 hour
+>>>>>>> 4b086a6540b6cbb39cf82d5f8e9d6189b3da6ba1
         )
         return jsonify({
             'url': presigned_post['url'],
