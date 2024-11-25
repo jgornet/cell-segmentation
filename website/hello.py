@@ -93,7 +93,7 @@ def get_upload_url():
             Params={
                 'Bucket': app.config['S3_BUCKET_INPUT'],
                 'Key': unique_filename,
-                'ContentType': request.json.get('contentType', 'application/octet-stream')
+                'ContentType': "image/tiff"  # Only upload TIFF files
             },
             ExpiresIn=3600  # URL expires in 1 hour
         )
