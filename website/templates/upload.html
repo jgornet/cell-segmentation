@@ -2,7 +2,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- ... (previous head content) ... -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voluseg Data Processing - Upload File</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .container { max-width: 800px; margin-top: 50px; }
+        .card { border: none; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .progress { height: 25px; }
+        .btn-primary { background-color: #007bff; border-color: #007bff; }
+        .btn-primary:hover { background-color: #0056b3; border-color: #0056b3; }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -34,94 +45,101 @@
     <script src="https://cdn.jsdelivr.net/npm/bs-custom-file-input/dist/bs-custom-file-input.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
     <script>
-        $(document).ready(function () {
-            bsCustomFileInput.init()
+    $(document).ready(function () {
+        bsCustomFileInput.init()
 
-            $('#upload-form').on('submit', function(e) {
-                e.preventDefault();
-                var file = document.getElementById('file-input').files[0];
-                if (!file) {
-                    $('#error').html('Please select a file to upload.');
-                    return;
+        $('#upload-form').on('submit', function(e) {
+            e.preventDefault();
+            var file = document.getElementById('file-input').files[0];
+            if (!file) {
+                $('#error').html('Please select a file to upload.');
+                return;
+            }
+
+            // Get the pre-signed POST data
+            $.ajax({
+                url: "{{ url_for('get_upload_url') }}",
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    fileName: file.name,
+                    contentType: file.type
+                }),
+                success: function(response) {
+                    uploadToS3(file, response.url, response.fields, response.fileName);
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    $('#error').html('Error getting upload URL: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
                 }
-
-                // Get the pre-signed URL
-                $.ajax({
-                    url: "{{ url_for('get_upload_url') }}",
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({
-                        fileName: file.name,
-                        contentType: file.type
-                    }),
-                    success: function(data) {
-                        uploadToS3(file, data.uploadUrl, data.fileName);
-                    },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        $('#error').html('Error getting upload URL: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
-                    }
-                });
             });
-
-            function uploadToS3(file, presignedUrl, fileName) {
-                $('.progress').show();
-                
-                $.ajax({
-                    xhr: function() {
-                        var xhr = new window.XMLHttpRequest();
-                        xhr.upload.addEventListener("progress", function(evt) {
-                            if (evt.lengthComputable) {
-                                var percentComplete = evt.loaded / evt.total * 100;
-                                $('.progress-bar').width(percentComplete + '%');
-                                $('.progress-bar').text(percentComplete.toFixed(2) + '%');
-                            }
-                        }, false);
-                        return xhr;
-                    },
-                    url: presignedUrl,
-                    type: 'PUT',
-                    data: file,
-                    processData: false,
-                    contentType: file.type,
-                    success: function() {
-                        completeUpload(fileName);
-                    },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        $('#error').html('Error uploading to S3: ' + errorThrown);
-                    }
-                });
-            }
-
-            function completeUpload(fileName) {
-                $.ajax({
-                    url: "{{ url_for('complete_upload') }}",
-                    type: 'POST',
-                    contentType: 'application/json',
-                    data: JSON.stringify({fileName: fileName}),
-                    success: function(data) {
-                        $('#status').html('Upload successful, processing started. Task ID: ' + data.task_id);
-                        $('#error').html('');
-                        checkStatus(data.task_id);
-                    },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        $('#error').html('Error completing upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
-                    }
-                });
-            }
-
-            function checkStatus(taskId) {
-                $.get("{{ url_for('get_status', task_id='') }}" + taskId, function(data) {
-                    $('#status').html('Status: ' + data.status);
-                    if (data.state != 'SUCCESS' && data.state != 'FAILURE') {
-                        setTimeout(function() {
-                            checkStatus(taskId);
-                        }, 5000);
-                    }
-                }).fail(function(jqXHR, textStatus, errorThrown) {
-                    $('#error').html('Error checking status: ' + errorThrown);
-                });
-            }
         });
+
+        function uploadToS3(file, url, fields, fileName) {
+            $('.progress').show();
+            
+            var formData = new FormData();
+            Object.keys(fields).forEach(function(key) {
+                formData.append(key, fields[key]);
+            });
+            formData.append('file', file);
+
+            $.ajax({
+                xhr: function() {
+                    var xhr = new window.XMLHttpRequest();
+                    xhr.upload.addEventListener("progress", function(evt) {
+                        if (evt.lengthComputable) {
+                            var percentComplete = evt.loaded / evt.total * 100;
+                            $('.progress-bar').width(percentComplete + '%');
+                            $('.progress-bar').text(percentComplete.toFixed(2) + '%');
+                        }
+                    }, false);
+                    return xhr;
+                },
+                url: url,
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function() {
+                    completeUpload(fileName);
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    $('#error').html('Error uploading to S3: ' + errorThrown);
+                    console.error('Full error response:', jqXHR.responseText);
+                }
+            });
+        }
+
+        function completeUpload(fileName) {
+            $.ajax({
+                url: "{{ url_for('complete_upload') }}",
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({fileName: fileName}),
+                success: function(data) {
+                    $('#status').html('Upload successful, processing started. Task ID: ' + data.task_id);
+                    $('#error').html('');
+                    checkStatus(data.task_id);
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    $('#error').html('Error completing upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
+                }
+            });
+        }
+
+        function checkStatus(taskId) {
+            $.get("{{ url_for('get_status', task_id='') }}" + taskId, function(data) {
+                $('#status').html('Status: ' + data.status);
+                if (data.state != 'SUCCESS' && data.state != 'FAILURE') {
+                    setTimeout(function() {
+                        checkStatus(taskId);
+                    }, 5000);
+                }
+            }).fail(function(jqXHR, textStatus, errorThrown) {
+                $('#error').html('Error checking status: ' + errorThrown);
+            });
+        }
+    });
     </script>
 </body>
 </html>

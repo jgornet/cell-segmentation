@@ -81,28 +81,30 @@ def get_upload_url():
         return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
 
     file_name = request.json.get('fileName')
-    if not file_name:
-        return jsonify({'error': 'No file name provided'}), 400
+    content_type = request.json.get('contentType')
+    if not file_name or not content_type:
+        return jsonify({'error': 'File name and content type are required'}), 400
 
     # Generate a unique file name to avoid overwrites
     unique_filename = f"{uuid.uuid4()}-{secure_filename(file_name)}"
 
     try:
-        presigned_url = s3_client.generate_presigned_url(
-            'put_object',
-            Params={
-                'Bucket': app.config['S3_BUCKET_INPUT'],
-                'Key': unique_filename,
-                'ContentType': request.json.get('contentType', 'application/octet-stream')
-            },
-            ExpiresIn=3600  # URL expires in 1 hour
+        presigned_post = s3_client.generate_presigned_post(
+            Bucket=app.config['S3_BUCKET_INPUT'],
+            Key=unique_filename,
+            Fields={"Content-Type": content_type},
+            Conditions=[
+                {"Content-Type": content_type}
+            ],
+            ExpiresIn=3600
         )
         return jsonify({
-            'uploadUrl': presigned_url,
+            'url': presigned_post['url'],
+            'fields': presigned_post['fields'],
             'fileName': unique_filename
         })
     except ClientError as e:
-        return jsonify({'error': f'Error generating pre-signed URL: {str(e)}'}), 500
+        return jsonify({'error': f'Error generating pre-signed POST data: {str(e)}'}), 500
 
 @app.route('/complete_upload', methods=['POST'])
 @auth.login_required

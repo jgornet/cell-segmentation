@@ -25,7 +25,7 @@ RUN pip install \
 COPY website /website
 
 WORKDIR /website
-# ENTRYPOINT [ "/usr/local/bin/flask", "--app", "hello", "run", "--host=0.0.0.0" ]
+ENTRYPOINT [ "/usr/local/bin/flask", "--app", "hello", "run", "--host=0.0.0.0" ]
 
 
 # # Dockerfile.webserver
