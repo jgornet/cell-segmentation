@@ -74,15 +74,9 @@
             });
         });
 
-        function uploadToS3(file, url, fields, fileName) {
+        function uploadToS3(file, presignedUrl, fileName) {
             $('.progress').show();
             
-            var formData = new FormData();
-            Object.keys(fields).forEach(function(key) {
-                formData.append(key, fields[key]);
-            });
-            formData.append('file', file);
-
             $.ajax({
                 xhr: function() {
                     var xhr = new window.XMLHttpRequest();
@@ -95,11 +89,11 @@
                     }, false);
                     return xhr;
                 },
-                url: url,
-                type: 'POST',
-                data: formData,
+                url: presignedUrl,
+                type: 'PUT',
+                data: file,
                 processData: false,
-                contentType: false,
+                contentType: file.type,
                 success: function() {
                     completeUpload(fileName);
                 },

@@ -94,17 +94,16 @@ def get_upload_url():
             Params={
                 'Bucket': app.config['S3_BUCKET_INPUT'],
                 'Key': unique_filename,
-                'ContentType': "image/tiff/tif"  # Only upload TIFF files
+                'ContentType': "image/tiff"  # Only upload TIFF files
             },
             ExpiresIn=3600  # URL expires in 1 hour
         )
         return jsonify({
-            'url': presigned_post['url'],
-            'fields': presigned_post['fields'],
+            'url': presigned_url,
             'fileName': unique_filename
         })
     except ClientError as e:
-        return jsonify({'error': f'Error generating pre-signed POST data: {str(e)}'}), 500
+        return jsonify({'error': f'Error generating pre-signed URL: {str(e)}'}), 500
 
 @app.route('/complete_upload', methods=['POST'])
 @auth.login_required
