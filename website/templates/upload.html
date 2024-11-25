@@ -56,7 +56,7 @@
                 return;
             }
 
-            // Get the pre-signed POST data
+            // Get the pre-signed URL
             $.ajax({
                 url: "{{ url_for('get_upload_url') }}",
                 type: 'POST',
@@ -66,7 +66,8 @@
                     contentType: file.type
                 }),
                 success: function(response) {
-                    uploadToS3(file, response.url, response.fields, response.fileName);
+                    console.log('Server response:', response);
+                    uploadToS3(file, response.url, response.fileName);
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
                     $('#error').html('Error getting upload URL: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
@@ -98,8 +99,12 @@
                     completeUpload(fileName);
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
-                    $('#error').html('Error uploading to S3: ' + errorThrown);
-                    console.error('Full error response:', jqXHR.responseText);
+                    console.error('Error details:', {
+                        status: jqXHR.status,
+                        statusText: jqXHR.statusText,
+                        responseText: jqXHR.responseText
+                    });
+                    $('#error').html('Error uploading to S3: ' + errorThrown + '. Status: ' + jqXHR.status + ' ' + jqXHR.statusText);
                 }
             });
         }
