@@ -16,6 +16,8 @@ from celery import Celery
 import time
 from io import BytesIO
 import uuid
+from flask import redirect
+from urllib.parse import quote
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
@@ -148,27 +150,6 @@ def complete_multipart_upload():
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
 
-# @app.route('/status/<task_id>')
-# @auth.login_required
-# @limiter.limit("10 per minute")
-# def get_status(task_id):
-#     task = celery.AsyncResult(task_id)
-#     if task.state == 'PENDING':
-#         response = {
-#             'state': task.state,
-#             'status': 'Pending...'
-#         }
-#     elif task.state != 'FAILURE':
-#         response = {
-#             'state': task.state,
-#             'status': task.info.get('status', '')
-#         }
-#     else:
-#         response = {
-#             'state': task.state,
-#             'status': str(task.info)
-#         }
-#     return jsonify(response)
 
 @app.route('/files')
 @auth.login_required
@@ -187,9 +168,13 @@ def list_files():
         # Get processing status for input files
         file_status = {}
         for filename in input_files:
-            task = celery.AsyncResult(filename)  # Now using filename as task ID
+            task = celery.AsyncResult(filename)
             if task.state == 'PENDING':
-                file_status[filename] = 'Pending'
+                # Check if the task actually exists
+                if task.result is None and not task.failed():
+                    file_status[filename] = 'Not Started'
+                else:
+                    file_status[filename] = 'Pending'
             elif task.state == 'STARTED':
                 file_status[filename] = 'Processing'
             elif task.state == 'SUCCESS':
@@ -205,35 +190,38 @@ def list_files():
     except Exception as e:
         return jsonify({'error': f'Unexpected error while listing files: {str(e)}\n{traceback.format_exc()}'}), 500
 
+
 @app.route('/download/<bucket>/<filename>')
 @auth.login_required
 @limiter.limit("10 per minute")
 def download_file(bucket, filename):
-    if not s3_resource:
+    if not s3_client:
         return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
     
     try:
         if bucket not in [app.config['S3_BUCKET_INPUT'], app.config['S3_BUCKET_OUTPUT']]:
             abort(404)
         
-        file_obj = s3_resource.Object(bucket, filename)
-        file_stream = BytesIO()
-        file_obj.download_fileobj(file_stream)
-        file_stream.seek(0)
-        
-        return send_file(
-            file_stream,
-            as_attachment=True,
-            attachment_filename=filename,
-            mimetype='application/octet-stream'
+        # Generate a pre-signed URL
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': bucket,
+                'Key': filename,
+                'ResponseContentDisposition': f'attachment; filename="{quote(filename)}"'
+            },
+            ExpiresIn=3600  # URL expires in 1 hour
         )
+        
+        # Redirect the user to the pre-signed URL
+        return redirect(url)
+
     except ClientError as e:
-        if e.response['Error']['Code'] == "NoSuchKey":
-            abort(404)
-        else:
-            return jsonify({'error': f'S3 download error: {str(e)}'}), 500
+        app.logger.error(f"Error generating pre-signed URL: {str(e)}")
+        return jsonify({'error': f'Error generating download link: {str(e)}'}), 500
     except Exception as e:
-        return jsonify({'error': f'Unexpected error during file download: {str(e)}'}), 500
+        app.logger.error(f"Unexpected error: {str(e)}")
+        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 @app.errorhandler(500)
 def internal_server_error(error):
