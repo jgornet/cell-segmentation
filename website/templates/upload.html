@@ -105,7 +105,7 @@
                     type: 'PUT',
                     data: blob,
                     processData: false,
-                    contentType: file.type,
+                    contentType: false,  // Change this line
                     success: function(data, status, xhr) {
                         parts.push({
                             PartNumber: partNumber,
