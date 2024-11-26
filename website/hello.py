@@ -3,7 +3,7 @@
 import os
 import logging
 import traceback
-import math
+import uuid
 from flask import Flask, request, render_template, send_file, abort, jsonify, url_for
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -15,7 +15,6 @@ from botocore.exceptions import ClientError, NoCredentialsError
 from celery import Celery
 import time
 from io import BytesIO
-import uuid
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
@@ -83,70 +82,42 @@ def get_upload_url():
 
     file_name = request.json.get('fileName')
     content_type = request.json.get('contentType')
-    file_size = request.json.get('fileSize')
+    file_size = int(request.json.get('fileSize'))
     if not file_name or not content_type or not file_size:
         return jsonify({'error': 'File name, content type, and file size are required'}), 400
 
     # Generate a unique file name to avoid overwrites
     unique_filename = f"{uuid.uuid4()}-{secure_filename(file_name)}"
 
-    # Calculate the number of parts (assuming 5MB part size)
-    part_size = 5 * 1024 * 1024  # 5MB
-    total_parts = math.ceil(int(file_size) / part_size)
-
     try:
-        # Initiate multipart upload
-        multipart_upload = s3_client.create_multipart_upload(
+        presigned_post = s3_client.generate_presigned_post(
             Bucket=app.config['S3_BUCKET_INPUT'],
             Key=unique_filename,
-            ContentType=content_type
+            Fields={"Content-Type": content_type},
+            Conditions=[
+                ["content-length-range", 0, file_size + 1000000]  # Add some buffer
+            ],
+            ExpiresIn=3600
         )
-        
-        # Generate presigned URLs for each part
-        presigned_urls = []
-        for part_number in range(1, total_parts + 1):
-            presigned_url = s3_client.generate_presigned_url(
-                'upload_part',
-                Params={
-                    'Bucket': app.config['S3_BUCKET_INPUT'],
-                    'Key': unique_filename,
-                    'UploadId': multipart_upload['UploadId'],
-                    'PartNumber': part_number
-                },
-                ExpiresIn=3600  # URL expires in 1 hour
-            )
-            presigned_urls.append(presigned_url)
-
         return jsonify({
-            'uploadId': multipart_upload['UploadId'],
-            'urls': presigned_urls,
-            'fileName': unique_filename,
-            'contentType': content_type,
-            'partSize': part_size
+            'url': presigned_post['url'],
+            'fields': presigned_post['fields'],
+            'fileName': unique_filename
         })
     except ClientError as e:
-        return jsonify({'error': f'Error initiating multipart upload: {str(e)}'}), 500
+        return jsonify({'error': f'Error generating pre-signed POST data: {str(e)}'}), 500
 
-@app.route('/complete_multipart_upload', methods=['POST'])
+@app.route('/complete_upload', methods=['POST'])
 @auth.login_required
 @limiter.limit("10 per minute")
-def complete_multipart_upload():
-    data = request.json
-    if not data or 'fileName' not in data or 'uploadId' not in data or 'parts' not in data:
-        return jsonify({'error': 'Missing required data'}), 400
+def complete_upload():
+    filename = request.json.get('fileName')
+    if not filename:
+        return jsonify({'error': 'No file name provided'}), 400
 
-    try:
-        response = s3_client.complete_multipart_upload(
-            Bucket=app.config['S3_BUCKET_INPUT'],
-            Key=data['fileName'],
-            UploadId=data['uploadId'],
-            MultipartUpload={'Parts': data['parts']}
-        )
-        # Enqueue processing task
-        task = celery.send_task('worker.process_volume', args=[data['fileName']])
-        return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
-    except ClientError as e:
-        return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
+    # Enqueue processing task
+    task = celery.send_task('worker.process_volume', args=[filename])
+    return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
 
 @app.route('/status/<task_id>')
 @auth.login_required
