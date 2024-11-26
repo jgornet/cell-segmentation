@@ -17,6 +17,7 @@ import time
 from io import BytesIO
 import uuid
 from flask import redirect
+from celery.task.control import inspect
 from urllib.parse import quote
 
 app = Flask(__name__)
@@ -168,13 +169,9 @@ def list_files():
         # Get processing status for input files
         file_status = {}
         for filename in input_files:
-            task = celery.AsyncResult(filename)
+            task = celery.AsyncResult(filename)  # Now using filename as task ID
             if task.state == 'PENDING':
-                # Check if the task actually exists
-                if task.result is None and not task.failed():
-                    file_status[filename] = 'Not Started'
-                else:
-                    file_status[filename] = 'Pending'
+                file_status[filename] = 'Pending'
             elif task.state == 'STARTED':
                 file_status[filename] = 'Processing'
             elif task.state == 'SUCCESS':
@@ -184,7 +181,25 @@ def list_files():
             else:
                 file_status[filename] = f'Unknown ({task.state})'
         
-        return render_template('files.html', input_files=input_files, output_files=output_files, file_status=file_status)
+        # Get currently running tasks
+        running_tasks = []
+        try:
+            # Use the same Celery app configuration
+            i = inspect([celery.conf.broker_url], app=celery)
+            active_tasks = i.active()
+            if active_tasks:
+                for worker, tasks in active_tasks.items():
+                    for task in tasks:
+                        if task['name'] == 'worker.process_volume':
+                            running_tasks.append(task['args'][0])  # Assuming the filename is the first argument
+        except Exception as e:
+            app.logger.error(f"Error inspecting Celery tasks: {str(e)}")
+        
+        return render_template('files.html', 
+                               input_files=input_files, 
+                               output_files=output_files, 
+                               file_status=file_status,
+                               running_tasks=running_tasks)
     except ClientError as e:
         return jsonify({'error': f'S3 list error: {str(e)}'}), 500
     except Exception as e:
