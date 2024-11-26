@@ -90,34 +90,61 @@ def get_upload_url():
     unique_filename = f"{uuid.uuid4()}-{secure_filename(file_name)}"
 
     try:
-        presigned_post = s3_client.generate_presigned_post(
+        # Initiate multipart upload
+        multipart_upload = s3_client.create_multipart_upload(
             Bucket=app.config['S3_BUCKET_INPUT'],
             Key=unique_filename,
-            Fields={"Content-Type": content_type},
-            Conditions=[
-                ["content-length-range", 0, file_size + 1000000]  # Add some buffer
-            ],
-            ExpiresIn=3600
+            ContentType=content_type
         )
+        
+        # Calculate the number of parts (assuming 5MB part size)
+        part_size = 5 * 1024 * 1024  # 5MB
+        total_parts = math.ceil(file_size / part_size)
+
+        # Generate presigned URLs for each part
+        presigned_urls = []
+        for part_number in range(1, total_parts + 1):
+            presigned_url = s3_client.generate_presigned_url(
+                'upload_part',
+                Params={
+                    'Bucket': app.config['S3_BUCKET_INPUT'],
+                    'Key': unique_filename,
+                    'UploadId': multipart_upload['UploadId'],
+                    'PartNumber': part_number
+                },
+                ExpiresIn=3600  # URL expires in 1 hour
+            )
+            presigned_urls.append(presigned_url)
+
         return jsonify({
-            'url': presigned_post['url'],
-            'fields': presigned_post['fields'],
-            'fileName': unique_filename
+            'uploadId': multipart_upload['UploadId'],
+            'urls': presigned_urls,
+            'fileName': unique_filename,
+            'partSize': part_size
         })
     except ClientError as e:
-        return jsonify({'error': f'Error generating pre-signed POST data: {str(e)}'}), 500
+        return jsonify({'error': f'Error initiating multipart upload: {str(e)}'}), 500
 
-@app.route('/complete_upload', methods=['POST'])
+@app.route('/complete_multipart_upload', methods=['POST'])
 @auth.login_required
 @limiter.limit("10 per minute")
-def complete_upload():
-    filename = request.json.get('fileName')
-    if not filename:
-        return jsonify({'error': 'No file name provided'}), 400
+def complete_multipart_upload():
+    data = request.json
+    if not data or 'fileName' not in data or 'uploadId' not in data or 'parts' not in data:
+        return jsonify({'error': 'Missing required data'}), 400
 
-    # Enqueue processing task
-    task = celery.send_task('worker.process_volume', args=[filename])
-    return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
+    try:
+        response = s3_client.complete_multipart_upload(
+            Bucket=app.config['S3_BUCKET_INPUT'],
+            Key=data['fileName'],
+            UploadId=data['uploadId'],
+            MultipartUpload={'Parts': data['parts']}
+        )
+        # Enqueue processing task
+        task = celery.send_task('worker.process_volume', args=[data['fileName']])
+        return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
+    except ClientError as e:
+        return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
 
 @app.route('/status/<task_id>')
 @auth.login_required
