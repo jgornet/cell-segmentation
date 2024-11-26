@@ -18,6 +18,21 @@
             <div class="card-body">
                 <h2 class="card-title text-center mb-4">Files</h2>
                 <div id="error" class="alert alert-danger" style="display: none;"></div>
+                
+                <h3>Currently Processing Files</h3>
+                <ul class="list-group mb-4">
+                    {% if running_tasks %}
+                        {% for task in running_tasks %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ task }}
+                                <span class="badge badge-primary">Processing</span>
+                            </li>
+                        {% endfor %}
+                    {% else %}
+                        <li class="list-group-item">No files currently processing</li>
+                    {% endif %}
+                </ul>
+
                 <h3>Input Files</h3>
                 <ul class="list-group mb-4">
                     {% for file in input_files %}
@@ -30,8 +45,11 @@
                                 <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_INPUT'], filename=file) }}" class="btn btn-sm btn-primary ml-2">Download</a>
                             </span>
                         </li>
+                    {% else %}
+                        <li class="list-group-item">No input files</li>
                     {% endfor %}
                 </ul>
+
                 <h3>Output Files</h3>
                 <ul class="list-group">
                     {% for file in output_files %}
@@ -39,8 +57,11 @@
                             {{ file }}
                             <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_OUTPUT'], filename=file) }}" class="btn btn-sm btn-primary">Download</a>
                         </li>
+                    {% else %}
+                        <li class="list-group-item">No output files</li>
                     {% endfor %}
                 </ul>
+                
                 <div class="mt-4">
                     <a href="{{ url_for('upload_form') }}" class="btn btn-outline-secondary btn-sm">Upload New File</a>
                 </div>

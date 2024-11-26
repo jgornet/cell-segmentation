@@ -13,11 +13,10 @@ from flask_limiter.util import get_remote_address
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError
 from celery import Celery
+from celery.task.control import inspect
 import time
 from io import BytesIO
 import uuid
-from flask import redirect
-from urllib.parse import quote
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
@@ -150,7 +149,6 @@ def complete_multipart_upload():
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
 
-
 @app.route('/files')
 @auth.login_required
 @limiter.limit("10 per minute")
@@ -168,13 +166,9 @@ def list_files():
         # Get processing status for input files
         file_status = {}
         for filename in input_files:
-            task = celery.AsyncResult(filename)
+            task = celery.AsyncResult(filename)  # Now using filename as task ID
             if task.state == 'PENDING':
-                # Check if the task actually exists
-                if task.result is None and not task.failed():
-                    file_status[filename] = 'Not Started'
-                else:
-                    file_status[filename] = 'Pending'
+                file_status[filename] = 'Pending'
             elif task.state == 'STARTED':
                 file_status[filename] = 'Processing'
             elif task.state == 'SUCCESS':
@@ -184,44 +178,59 @@ def list_files():
             else:
                 file_status[filename] = f'Unknown ({task.state})'
         
-        return render_template('files.html', input_files=input_files, output_files=output_files, file_status=file_status)
+        # Get currently running tasks
+        running_tasks = []
+        try:
+            # Use the same Celery app configuration
+            i = inspect([celery.conf.broker_url], app=celery)
+            active_tasks = i.active()
+            if active_tasks:
+                for worker, tasks in active_tasks.items():
+                    for task in tasks:
+                        if task['name'] == 'worker.process_volume':
+                            running_tasks.append(task['args'][0])  # Assuming the filename is the first argument
+        except Exception as e:
+            app.logger.error(f"Error inspecting Celery tasks: {str(e)}")
+        
+        return render_template('files.html', 
+                               input_files=input_files, 
+                               output_files=output_files, 
+                               file_status=file_status,
+                               running_tasks=running_tasks)
     except ClientError as e:
         return jsonify({'error': f'S3 list error: {str(e)}'}), 500
     except Exception as e:
         return jsonify({'error': f'Unexpected error while listing files: {str(e)}\n{traceback.format_exc()}'}), 500
 
-
 @app.route('/download/<bucket>/<filename>')
 @auth.login_required
 @limiter.limit("10 per minute")
 def download_file(bucket, filename):
-    if not s3_client:
+    if not s3_resource:
         return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
     
     try:
         if bucket not in [app.config['S3_BUCKET_INPUT'], app.config['S3_BUCKET_OUTPUT']]:
             abort(404)
         
-        # Generate a pre-signed URL
-        url = s3_client.generate_presigned_url(
-            'get_object',
-            Params={
-                'Bucket': bucket,
-                'Key': filename,
-                'ResponseContentDisposition': f'attachment; filename="{quote(filename)}"'
-            },
-            ExpiresIn=3600  # URL expires in 1 hour
-        )
+        file_obj = s3_resource.Object(bucket, filename)
+        file_stream = BytesIO()
+        file_obj.download_fileobj(file_stream)
+        file_stream.seek(0)
         
-        # Redirect the user to the pre-signed URL
-        return redirect(url)
-
+        return send_file(
+            file_stream,
+            as_attachment=True,
+            attachment_filename=filename,
+            mimetype='application/octet-stream'
+        )
     except ClientError as e:
-        app.logger.error(f"Error generating pre-signed URL: {str(e)}")
-        return jsonify({'error': f'Error generating download link: {str(e)}'}), 500
+        if e.response['Error']['Code'] == "NoSuchKey":
+            abort(404)
+        else:
+            return jsonify({'error': f'S3 download error: {str(e)}'}), 500
     except Exception as e:
-        app.logger.error(f"Unexpected error: {str(e)}")
-        return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
+        return jsonify({'error': f'Unexpected error during file download: {str(e)}'}), 500
 
 @app.errorhandler(500)
 def internal_server_error(error):
