@@ -105,7 +105,7 @@ def get_upload_url():
         # Generate presigned URLs for each part
         presigned_urls = []
         for part_number in range(1, total_parts + 1):
-           presigned_url = s3_client.generate_presigned_url(
+            presigned_url = s3_client.generate_presigned_url(
                 'upload_part',
                 Params={
                     'Bucket': app.config['S3_BUCKET_INPUT'],
@@ -115,9 +115,9 @@ def get_upload_url():
                     'ContentType': content_type  # Add this line
                 },
                 ExpiresIn=3600
-            )
+            ) 
         
-        presigned_urls.append(presigned_url)
+            presigned_urls.append(presigned_url)
 
         return jsonify({
             'uploadId': multipart_upload['UploadId'],
