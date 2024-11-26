@@ -112,7 +112,6 @@ def get_upload_url():
                     'Key': unique_filename,
                     'UploadId': multipart_upload['UploadId'],
                     'PartNumber': part_number,
-                    # 'ContentType': "image/tiff",  # Add this line
                 },
                 ExpiresIn=3600
             ) 
