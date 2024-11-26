@@ -183,9 +183,9 @@ def list_files():
         
         # Get currently running tasks
         running_tasks = []
+        celery_inspect_error = None
         try:
-            # Use the same Celery app configuration
-            i = inspect([celery.conf.broker_url], app=celery)
+            i = inspect([app.config['CELERY_BROKER_URL']], app=celery)
             active_tasks = i.active()
             if active_tasks:
                 for worker, tasks in active_tasks.items():
@@ -193,13 +193,15 @@ def list_files():
                         if task['name'] == 'worker.process_volume':
                             running_tasks.append(task['args'][0])  # Assuming the filename is the first argument
         except Exception as e:
+            celery_inspect_error = str(e)
             app.logger.error(f"Error inspecting Celery tasks: {str(e)}")
         
         return render_template('files.html', 
                                input_files=input_files, 
                                output_files=output_files, 
                                file_status=file_status,
-                               running_tasks=running_tasks)
+                               running_tasks=running_tasks,
+                               celery_inspect_error=celery_inspect_error)
     except ClientError as e:
         return jsonify({'error': f'S3 list error: {str(e)}'}), 500
     except Exception as e:
