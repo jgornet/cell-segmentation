@@ -16,8 +16,10 @@ from pyspark.sql import SparkSession
 from config import celery
 
 
-@celery.task()
-def process_volume(url):
+@celery.task(bind=True)
+def process_volume(self, url):
+    self.update_state(task_id=url, state='STARTED')
+    
     download_url = url
 
     print(f"Downloading {download_url}")

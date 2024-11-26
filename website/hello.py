@@ -143,32 +143,32 @@ def complete_multipart_upload():
             MultipartUpload={'Parts': data['parts']}
         )
         # Enqueue processing task
-        task = celery.send_task('worker.process_volume', args=[data['fileName']])
+        task = celery.send_task('worker.process_volume', args=[data['fileName']], task_id=data['fileName'])
         return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
 
-@app.route('/status/<task_id>')
-@auth.login_required
-@limiter.limit("10 per minute")
-def get_status(task_id):
-    task = celery.AsyncResult(task_id)
-    if task.state == 'PENDING':
-        response = {
-            'state': task.state,
-            'status': 'Pending...'
-        }
-    elif task.state != 'FAILURE':
-        response = {
-            'state': task.state,
-            'status': task.info.get('status', '')
-        }
-    else:
-        response = {
-            'state': task.state,
-            'status': str(task.info)
-        }
-    return jsonify(response)
+# @app.route('/status/<task_id>')
+# @auth.login_required
+# @limiter.limit("10 per minute")
+# def get_status(task_id):
+#     task = celery.AsyncResult(task_id)
+#     if task.state == 'PENDING':
+#         response = {
+#             'state': task.state,
+#             'status': 'Pending...'
+#         }
+#     elif task.state != 'FAILURE':
+#         response = {
+#             'state': task.state,
+#             'status': task.info.get('status', '')
+#         }
+#     else:
+#         response = {
+#             'state': task.state,
+#             'status': str(task.info)
+#         }
+#     return jsonify(response)
 
 @app.route('/files')
 @auth.login_required
@@ -187,15 +187,17 @@ def list_files():
         # Get processing status for input files
         file_status = {}
         for filename in input_files:
-            task = celery.AsyncResult(filename)
+            task = celery.AsyncResult(filename)  # Now using filename as task ID
             if task.state == 'PENDING':
                 file_status[filename] = 'Pending'
+            elif task.state == 'STARTED':
+                file_status[filename] = 'Processing'
             elif task.state == 'SUCCESS':
                 file_status[filename] = 'Completed'
             elif task.state == 'FAILURE':
                 file_status[filename] = 'Failed'
             else:
-                file_status[filename] = 'Processing'
+                file_status[filename] = f'Unknown ({task.state})'
         
         return render_template('files.html', input_files=input_files, output_files=output_files, file_status=file_status)
     except ClientError as e:

@@ -144,28 +144,9 @@
                 success: function(data) {
                     $('#status').html('Upload successful, processing started. Task ID: ' + data.task_id);
                     $('#error').html('');
-                    checkStatus(data.task_id);
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
                     $('#error').html('Error completing multipart upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
-                }
-            });
-        }
-        function checkStatus(taskId) {
-            $.ajax({
-                url: "{{ url_for('get_status', task_id='') }}" + taskId,
-                type: 'GET',
-                success: function(data) {
-                    $('#status').html('Status: ' + data.status);
-                    if (data.state != 'SUCCESS' && data.state != 'FAILURE') {
-                        // If the task is not complete, check again after 5 seconds
-                        setTimeout(function() {
-                            checkStatus(taskId);
-                        }, 5000);
-                    }
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    $('#error').html('Error checking status: ' + errorThrown);
                 }
             });
         }
