@@ -157,9 +157,10 @@ def list_files():
         input_files = [obj.key for obj in input_bucket.objects.all()]
         output_files = [obj.key for obj in output_bucket.objects.all()]
         
+        # Get processing status for input files
         file_status = {}
         for filename in input_files:
-            task = celery.AsyncResult(filename)
+            task = celery.AsyncResult(filename)  # Now using filename as task ID
             if task.state == 'PENDING':
                 file_status[filename] = 'Pending'
             elif task.state == 'STARTED':

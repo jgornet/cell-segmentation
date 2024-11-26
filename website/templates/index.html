@@ -190,22 +190,22 @@
                 var status = fileStatus[file] || 'Unknown';
                 var badgeClass = getBadgeClass(status);
                 inputList.append(
-                    `<li class="list-group-item d-flex justify-content-between align-items-center">
-                        ${file}
-                        <span>
-                            <span class="badge badge-${badgeClass}">${status}</span>
-                            <a href="{{ url_for('download_file', bucket='${app.config['S3_BUCKET_INPUT']}', filename='') }}${file}" class="btn btn-sm btn-primary ml-2">Download</a>
-                        </span>
-                    </li>`
+                    '<li class="list-group-item d-flex justify-content-between align-items-center">' +
+                        file +
+                        '<span>' +
+                            '<span class="badge badge-' + badgeClass + '">' + status + '</span>' +
+                            '<a href="' + "{{ url_for('download_file', bucket='" + "{{ config['S3_BUCKET_INPUT'] }}" + "', filename='') }}" + file + '" class="btn btn-sm btn-primary ml-2">Download</a>' +
+                        '</span>' +
+                    '</li>'
                 );
             });
 
             outputFiles.forEach(function(file) {
                 outputList.append(
-                    `<li class="list-group-item d-flex justify-content-between align-items-center">
-                        ${file}
-                        <a href="{{ url_for('download_file', bucket='${app.config['S3_BUCKET_OUTPUT']}', filename='') }}${file}" class="btn btn-sm btn-primary">Download</a>
-                    </li>`
+                    '<li class="list-group-item d-flex justify-content-between align-items-center">' +
+                        file +
+                        '<a href="' + "{{ url_for('download_file', bucket='" + "{{ config['S3_BUCKET_OUTPUT'] }}" + "', filename='') }}" + file + '" class="btn btn-sm btn-primary">Download</a>' +
+                    '</li>'
                 );
             });
         }
