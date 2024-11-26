@@ -17,7 +17,7 @@ import time
 from io import BytesIO
 import uuid
 from flask import redirect
-from celery.app.control import inspect
+from celery.app.control import Inspect
 from urllib.parse import quote
 
 app = Flask(__name__)
