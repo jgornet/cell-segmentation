@@ -56,72 +56,98 @@
                 return;
             }
 
-            // Get the pre-signed URL
+            // Get the pre-signed URLs for multipart upload
             $.ajax({
                 url: "{{ url_for('get_upload_url') }}",
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({
                     fileName: file.name,
-                    contentType: file.type
+                    contentType: file.type,
+                    fileSize: file.size
                 }),
                 success: function(response) {
                     console.log('Server response:', response);
-                    uploadToS3(file, response.url, response.fileName);
+                    uploadToS3(file, response);
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
-                    $('#error').html('Error getting upload URL: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
+                    $('#error').html('Error getting upload URLs: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
                 }
             });
         });
 
-        function uploadToS3(file, presignedUrl, fileName) {
+        function uploadToS3(file, response) {
             $('.progress').show();
-            
-            $.ajax({
-                xhr: function() {
-                    var xhr = new window.XMLHttpRequest();
-                    xhr.upload.addEventListener("progress", function(evt) {
-                        if (evt.lengthComputable) {
-                            var percentComplete = evt.loaded / evt.total * 100;
-                            $('.progress-bar').width(percentComplete + '%');
-                            $('.progress-bar').text(percentComplete.toFixed(2) + '%');
+            var uploadId = response.uploadId;
+            var urls = response.urls;
+            var fileName = response.fileName;
+            var partSize = response.partSize;
+            var parts = [];
+
+            function uploadPart(partNumber) {
+                var start = (partNumber - 1) * partSize;
+                var end = Math.min(start + partSize, file.size);
+                var blob = file.slice(start, end);
+
+                $.ajax({
+                    xhr: function() {
+                        var xhr = new window.XMLHttpRequest();
+                        xhr.upload.addEventListener("progress", function(evt) {
+                            if (evt.lengthComputable) {
+                                var percentComplete = ((partNumber - 1) * partSize + evt.loaded) / file.size * 100;
+                                $('.progress-bar').width(percentComplete + '%');
+                                $('.progress-bar').text(percentComplete.toFixed(2) + '%');
+                            }
+                        }, false);
+                        return xhr;
+                    },
+                    url: urls[partNumber - 1],
+                    type: 'PUT',
+                    data: blob,
+                    processData: false,
+                    contentType: file.type,
+                    success: function(data, status, xhr) {
+                        parts.push({
+                            PartNumber: partNumber,
+                            ETag: xhr.getResponseHeader('ETag')
+                        });
+                        if (partNumber < urls.length) {
+                            uploadPart(partNumber + 1);
+                        } else {
+                            completeMultipartUpload(fileName, uploadId, parts);
                         }
-                    }, false);
-                    return xhr;
-                },
-                url: presignedUrl,
-                type: 'PUT',
-                data: file,
-                processData: false,
-                contentType: file.type,
-                success: function() {
-                    completeUpload(fileName);
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error('Error details:', {
-                        status: jqXHR.status,
-                        statusText: jqXHR.statusText,
-                        responseText: jqXHR.responseText
-                    });
-                    $('#error').html('Error uploading to S3: ' + errorThrown + '. Status: ' + jqXHR.status + ' ' + jqXHR.statusText);
-                }
-            });
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        console.error('Error details:', {
+                            status: jqXHR.status,
+                            statusText: jqXHR.statusText,
+                            responseText: jqXHR.responseText
+                        });
+                        $('#error').html('Error uploading part ' + partNumber + ' to S3: ' + errorThrown + '. Status: ' + jqXHR.status + ' ' + jqXHR.statusText);
+                    }
+                });
+            }
+
+            uploadPart(1);
         }
 
-        function completeUpload(fileName) {
+        function completeMultipartUpload(fileName, uploadId, parts) {
             $.ajax({
-                url: "{{ url_for('complete_upload') }}",
+                url: "{{ url_for('complete_multipart_upload') }}",
                 type: 'POST',
                 contentType: 'application/json',
-                data: JSON.stringify({fileName: fileName}),
+                data: JSON.stringify({
+                    fileName: fileName,
+                    uploadId: uploadId,
+                    parts: parts
+                }),
                 success: function(data) {
                     $('#status').html('Upload successful, processing started. Task ID: ' + data.task_id);
                     $('#error').html('');
                     checkStatus(data.task_id);
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
-                    $('#error').html('Error completing upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
+                    $('#error').html('Error completing multipart upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
                 }
             });
         }
