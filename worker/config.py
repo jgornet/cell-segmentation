@@ -13,6 +13,7 @@ use_ssl = {
 RABBITMQ_URL = os.environ["RABBITMQ_URL"]
 REDIS_URL = f"rediss://:@{os.environ['REDIS_HOST']}:{os.environ['REDIS_PORT']}/0"
 
+
 celery = Celery(
     "tasks",
     broker=RABBITMQ_URL,
