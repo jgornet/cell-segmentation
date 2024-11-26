@@ -4,7 +4,7 @@ import os
 import logging
 import traceback
 import math
-from flask import Flask, request, render_template, send_file, abort, jsonify, url_for, redirect
+from flask import Flask, request, render_template, send_file, abort, jsonify, url_for
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -16,6 +16,7 @@ from celery import Celery
 import time
 from io import BytesIO
 import uuid
+from flask import redirect
 from urllib.parse import quote
 
 app = Flask(__name__)
@@ -72,8 +73,8 @@ def auth_error(status):
 @app.route('/')
 @auth.login_required
 @limiter.limit("10 per minute")
-def index():
-    return render_template('index.html')
+def upload_form():
+    return render_template('upload.html')
 
 @app.route('/get_upload_url', methods=['POST'])
 @auth.login_required
@@ -88,18 +89,22 @@ def get_upload_url():
     if not file_name or not content_type or not file_size:
         return jsonify({'error': 'File name, content type, and file size are required'}), 400
 
+    # Generate a unique file name to avoid overwrites
     unique_filename = f"{uuid.uuid4()}-{secure_filename(file_name)}"
 
     try:
+        # Initiate multipart upload
         multipart_upload = s3_client.create_multipart_upload(
             Bucket=app.config['S3_BUCKET_INPUT'],
             Key=unique_filename,
-            ContentType=content_type
+            ContentType="image/tiff"
         )
         
+        # Calculate the number of parts (assuming 5MB part size)
         part_size = 5 * 1024 * 1024  # 5MB
         total_parts = math.ceil(file_size / part_size)
 
+        # Generate presigned URLs for each part
         presigned_urls = []
         for part_number in range(1, total_parts + 1):
             presigned_url = s3_client.generate_presigned_url(
@@ -112,6 +117,7 @@ def get_upload_url():
                 },
                 ExpiresIn=3600
             ) 
+        
             presigned_urls.append(presigned_url)
 
         return jsonify({
@@ -138,10 +144,12 @@ def complete_multipart_upload():
             UploadId=data['uploadId'],
             MultipartUpload={'Parts': data['parts']}
         )
+        # Enqueue processing task
         task = celery.send_task('worker.process_volume', args=[data['fileName']], task_id=data['fileName'])
         return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
+
 
 @app.route('/files')
 @auth.login_required
@@ -160,9 +168,13 @@ def list_files():
         # Get processing status for input files
         file_status = {}
         for filename in input_files:
-            task = celery.AsyncResult(filename)  # Now using filename as task ID
+            task = celery.AsyncResult(filename)
             if task.state == 'PENDING':
-                file_status[filename] = 'Pending'
+                # Check if the task actually exists
+                if task.result is None and not task.failed():
+                    file_status[filename] = 'Not Started'
+                else:
+                    file_status[filename] = 'Pending'
             elif task.state == 'STARTED':
                 file_status[filename] = 'Processing'
             elif task.state == 'SUCCESS':
@@ -172,15 +184,12 @@ def list_files():
             else:
                 file_status[filename] = f'Unknown ({task.state})'
         
-        return jsonify({
-            'input_files': input_files,
-            'output_files': output_files,
-            'file_status': file_status
-        })
+        return render_template('files.html', input_files=input_files, output_files=output_files, file_status=file_status)
     except ClientError as e:
         return jsonify({'error': f'S3 list error: {str(e)}'}), 500
     except Exception as e:
         return jsonify({'error': f'Unexpected error while listing files: {str(e)}\n{traceback.format_exc()}'}), 500
+
 
 @app.route('/download/<bucket>/<filename>')
 @auth.login_required
@@ -193,6 +202,7 @@ def download_file(bucket, filename):
         if bucket not in [app.config['S3_BUCKET_INPUT'], app.config['S3_BUCKET_OUTPUT']]:
             abort(404)
         
+        # Generate a pre-signed URL
         url = s3_client.generate_presigned_url(
             'get_object',
             Params={
@@ -203,6 +213,7 @@ def download_file(bucket, filename):
             ExpiresIn=3600  # URL expires in 1 hour
         )
         
+        # Redirect the user to the pre-signed URL
         return redirect(url)
 
     except ClientError as e:
