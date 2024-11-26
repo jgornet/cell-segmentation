@@ -17,7 +17,7 @@ import time
 from io import BytesIO
 import uuid
 from flask import redirect
-from celery.task.control import inspect
+from celery.app.control import inspect
 from urllib.parse import quote
 
 app = Flask(__name__)
@@ -152,6 +152,8 @@ def complete_multipart_upload():
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
 
 
+from celery.app.control import Inspect
+
 @app.route('/files')
 @auth.login_required
 @limiter.limit("10 per minute")
@@ -185,13 +187,18 @@ def list_files():
         running_tasks = []
         celery_inspect_error = None
         try:
-            i = inspect([app.config['CELERY_BROKER_URL']], app=celery)
+            # Create an Inspect instance
+            i = Inspect(app=celery)
+            
+            # Get active tasks
             active_tasks = i.active()
+            
             if active_tasks:
                 for worker, tasks in active_tasks.items():
                     for task in tasks:
-                        if task['name'] == 'worker.process_volume':
-                            running_tasks.append(task['args'][0])  # Assuming the filename is the first argument
+                        if task.get('name') == 'worker.process_volume':
+                            # Assuming the filename is the first argument
+                            running_tasks.append(task.get('args', [''])[0])
         except Exception as e:
             celery_inspect_error = str(e)
             app.logger.error(f"Error inspecting Celery tasks: {str(e)}")
