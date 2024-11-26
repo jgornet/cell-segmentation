@@ -116,7 +116,8 @@ def get_upload_url():
                 },
                 ExpiresIn=3600
             )
-            presigned_urls.append(presigned_url)
+        
+        presigned_urls.append(presigned_url)
 
         return jsonify({
             'uploadId': multipart_upload['UploadId'],
