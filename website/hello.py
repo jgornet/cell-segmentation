@@ -95,7 +95,7 @@ def get_upload_url():
         multipart_upload = s3_client.create_multipart_upload(
             Bucket=app.config['S3_BUCKET_INPUT'],
             Key=unique_filename,
-            ContentType=content_type
+            ContentType="image/tiff"
         )
         
         # Calculate the number of parts (assuming 5MB part size)
@@ -112,7 +112,7 @@ def get_upload_url():
                     'Key': unique_filename,
                     'UploadId': multipart_upload['UploadId'],
                     'PartNumber': part_number,
-                    'ContentType': content_type  # Add this line
+                    'ContentType': "image/tiff",  # Add this line
                 },
                 ExpiresIn=3600
             ) 
