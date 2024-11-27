@@ -38,6 +38,7 @@ app.config['CELERY_RESULT_BACKEND'] = os.environ.get('REDIS_URL', 'redis://redis
 # Initialize Celery
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
 celery.conf.update(app.config)
+celery.conf.task_default_queue = 'tasks'
 
 # S3 client and resource
 try:
@@ -146,13 +147,11 @@ def complete_multipart_upload():
             MultipartUpload={'Parts': data['parts']}
         )
         # Enqueue processing task
-        task = celery.send_task('worker.process_volume', args=[data['fileName']], task_id=data['fileName'])
+        task = celery.send_task('worker.process_volume', args=[data['fileName']], task_id=data['fileName'], queue='tasks')
         return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
 
-
-from celery.app.control import Inspect
 
 @app.route('/files')
 @auth.login_required
