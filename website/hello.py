@@ -38,6 +38,7 @@ app.config['CELERY_RESULT_BACKEND'] = os.environ.get('REDIS_URL', 'redis://redis
 # Initialize Celery
 celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
 celery.conf.update(app.config)
+celery.conf.result_backend = app.config['CELERY_RESULT_BACKEND']
 celery.conf.task_default_queue = 'tasks'
 
 # S3 client and resource
