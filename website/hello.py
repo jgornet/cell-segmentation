@@ -35,11 +35,32 @@ app.config['S3_BUCKET_OUTPUT'] = os.environ.get('S3_BUCKET_OUTPUT', 'voluseg-out
 app.config['CELERY_BROKER_URL'] = os.environ.get('RABBITMQ_URL', 'amqp://guest:guest@rabbitmq-service:5672/celery_vhost')
 app.config['CELERY_RESULT_BACKEND'] = os.environ.get('REDIS_URL', 'redis://redis-service:6380/0')
 
+RABBITMQ_URL= os.environ.get('RABBITMQ_URL', 'amqp://guest:guest@rabbitmq-service:5672/celery_vhost')
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis-service:6380/0')
+
 # Initialize Celery
-celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
-celery.conf.update(app.config)
-celery.conf.result_backend = app.config['CELERY_RESULT_BACKEND']
-celery.conf.task_default_queue = 'tasks'
+# celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'], backend=app.config['CELERY_RESULT_BACKEND'])
+# celery.conf.update(app.config)
+# celery.conf.result_backend = app.config['CELERY_RESULT_BACKEND']
+# celery.conf.task_default_queue = 'tasks'
+
+celery = Celery(
+    "tasks",
+    broker=RABBITMQ_URL,
+    # broker_use_ssl=use_ssl,
+    backend=REDIS_URL,
+    # redis_backend_use_ssl=use_ssl,
+    task_compression="gzip",
+    task_track_started=True,  # by default does not report this granularly
+    task_acks_late=True,
+    task_acks_on_failure_or_timeout=True,
+    worker_cancel_long_running_tasks_on_connection_loss=False,
+    worker_prefetch_multiplier=1,
+    result_extended=True,
+    broker_connection_max_retries=None,
+    broker_connection_timeout=72 * 60 * 60,
+)
+celery.conf.broker_transport_options = {"visibility_timeout": 24 * 60 * 60}
 
 # S3 client and resource
 try:
