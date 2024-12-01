@@ -14,7 +14,7 @@ spec:
     metadata:
       labels:
         app: voluseg-worker
-    spec:60Gi
+    spec:
       imagePullSecrets:
       - name: regcred
       nodeSelector:
@@ -26,7 +26,7 @@ spec:
         effect: "NoSchedule"
       containers:
       - name: voluseg-worker
-        image: gornet/voluseg-worker:0.0.22
+        image: gornet/voluseg-worker:0.0.25
         env:
         - name: S3_ACCESS_KEY_ID
           valueFrom:
@@ -38,16 +38,11 @@ spec:
             secretKeyRef:
               name: aws-s3-secret
               key: S3_SECRET_ACCESS_KEY
-        - name: REDIS_HOST
-          value: "redis-tls-service"
-        - name: REDIS_PORT
-          value: "6379"
+        - name: REDIS_URL
+          value: "redis://redis-service:6380/0"
         - name: RABBITMQ_URL
           value: "amqp://guest:guest@rabbitmq-service:5672/celery_vhost"
         volumeMounts:
-        - name: redis-tls
-          mountPath: /etc/redis/tls
-          readOnly: true
         - name: temporary-volume
           mountPath: /data
         resources:
@@ -76,13 +71,13 @@ spec:
     name: voluseg-worker
     kind: Deployment
   pollingInterval: 30
-  cooldownPeriod: 300
+  cooldownPeriod: 10800
   maxReplicaCount: 20
   minReplicaCount: 0
   triggers:
-    - type: rabbitmq
+    - type: redis
       metadata:
-        host: "amqp://guest:guest@rabbitmq-service.default.svc.cluster.local:5672/celery_vhost"
-        queueName: "tasks"
-        mode: "QueueLength"
-        value: "5"
+        address: "redis-service.default.svc.cluster.local:6380"
+        databaseIndex: "0"
+        listName: "tasks"
+        activationListLength: "1"

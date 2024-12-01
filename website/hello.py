@@ -32,7 +32,7 @@ limiter = Limiter(
 # Configuration
 app.config['S3_BUCKET_INPUT'] = os.environ.get('S3_BUCKET_INPUT', 'voluseg-input')
 app.config['S3_BUCKET_OUTPUT'] = os.environ.get('S3_BUCKET_OUTPUT', 'voluseg-output')
-app.config['CELERY_BROKER_URL'] = os.environ.get('RABBITMQ_URL', 'amqp://guest:guest@rabbitmq-service:5672/celery_vhost')
+app.config['CELERY_BROKER_URL'] = os.environ.get('RABBITMQ_URL', 'redis://redis-service:6380/0')
 app.config['CELERY_RESULT_BACKEND'] = os.environ.get('REDIS_URL', 'redis://redis-service:6380/0')
 
 RABBITMQ_URL= os.environ.get('RABBITMQ_URL', 'amqp://guest:guest@rabbitmq-service:5672/celery_vhost')
