@@ -10,6 +10,7 @@ RUN mkdir -p /ANTs/build
 WORKDIR /ANTs/build
 
 RUN cmake \
+    -DCMAKE_INSTALL_PREFIX=/opt/ANTs \
     -DBUILD_TESTING=OFF \
     -DRUN_LONG_TESTS=OFF \
     -DRUN_SHORT_TESTS=OFF \
