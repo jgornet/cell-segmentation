@@ -60,6 +60,22 @@
                 <input type="text" class="form-control search-box" id="inputSearch" placeholder="Search input files...">
                 <div class="scrollable-list mb-4">
                     <ul class="list-group" id="inputFilesList">
+                        <!-- Test items -->
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            test_file_1.txt
+                            <span>
+                                <span class="badge badge-success">Completed</span>
+                                <a href="#" class="btn btn-sm btn-primary ml-2">Download</a>
+                            </span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            another_file_2.txt
+                            <span>
+                                <span class="badge badge-success">Completed</span>
+                                <a href="#" class="btn btn-sm btn-primary ml-2">Download</a>
+                            </span>
+                        </li>
+                        <!-- End test items -->
                         {% for file in input_files %}
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 {{ file }}
@@ -109,9 +125,14 @@
             // Search functionality for input files
             $("#inputSearch").on("keyup", function() {
                 var value = $(this).val().toLowerCase();
+                console.log("Searching for:", value);
+                console.log("Number of items:", $("#inputFilesList li").length);
+                
                 $("#inputFilesList li").each(function() {
                     var text = $(this).text().toLowerCase();
-                    $(this).toggle(text.includes(value));
+                    var shouldShow = text.includes(value);
+                    console.log("Item text:", text, "Should show:", shouldShow);
+                    $(this).toggle(shouldShow);
                 });
             });
 
