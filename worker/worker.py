@@ -97,29 +97,29 @@ def generate_output(custom_parameters=None):
 
     parameters = voluseg.parameter_dictionary()
 
-    # if custom_parameters:
-    #     c_parameters = loads(custom_parameters)
-    #     for key, value in c_parameters.items():
-    #         parameters[key] = value
+    if custom_parameters:
+        c_parameters = loads(custom_parameters)
+        for key, value in c_parameters.items():
+            parameters[key] = value
 
-    # else:
-    #     parameters["registration"] = "high"
-    #     parameters["diam_cell"] = 5.0
-    #     parameters["f_volume"] = 1.0
-    #     parameters["t_section"] = 0.04
-    #     parameters["ds"] = 1
-    #     parameters["res_x"] = 0.585
-    #     parameters["res_y"] = 0.585
-    #     parameters["res_z"] = 25
+    else:
+        parameters["registration"] = "high"
+        parameters["diam_cell"] = 5.0
+        parameters["f_volume"] = 1.0
+        parameters["t_section"] = 0.04
+        parameters["ds"] = 1
+        parameters["res_x"] = 0.585
+        parameters["res_y"] = 0.585
+        parameters["res_z"] = 25
 
-    parameters["registration"] = "high"
-    parameters["diam_cell"] = 5.0
-    parameters["f_volume"] = 1.0
-    parameters["t_section"] = 0.04
-    parameters["ds"] = 1
-    parameters["res_x"] = 0.585
-    parameters["res_y"] = 0.585
-    parameters["res_z"] = 25
+    # parameters["registration"] = "high"
+    # parameters["diam_cell"] = 5.0
+    # parameters["f_volume"] = 1.0
+    # parameters["t_section"] = 0.04
+    # parameters["ds"] = 1
+    # parameters["res_x"] = 0.585
+    # parameters["res_y"] = 0.585
+    # parameters["res_z"] = 25
 
     parameters["dir_ants"] = "/opt/ANTs/bin"
     parameters["dir_input"] = "/data/h5_volume"
