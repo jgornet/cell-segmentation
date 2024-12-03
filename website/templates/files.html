@@ -104,8 +104,8 @@
     <script>
         $(document).ready(function() {
             // Safely handle error message from server
-            var errorMessage = "{{ error|default('')|tojson|safe }}";
-            if (errorMessage) {
+            var errorMessage = {{ error|tojson|safe if error else 'null' }};
+            if (errorMessage && errorMessage !== null) {
                 $('#error').text(errorMessage).show();
             }
 
