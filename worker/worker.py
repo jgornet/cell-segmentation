@@ -36,7 +36,7 @@ def process_volume(self, url):
 
     print("Uploading traces")
     fn = os.path.splitext(url)[0]
-    upload_url = f"{fn}.hdf5"
+    upload_url = f"{fn}.zip"
     upload_traces(upload_url)
     print("Uploaded traces")
 
@@ -120,13 +120,23 @@ def generate_traces():
 
 
 def upload_traces(url: str):
+    # Replace .hdf5 extension with .zip
+    # url = url.replace('.hdf5', '.zip')
+    
+    # Create zip file of the output directory
+    shutil.make_archive('/data/output_archive', 'zip', '/data/output')
+    
+    # Upload to S3
     s3 = boto3.resource(
         "s3",
         aws_access_key_id=os.environ["S3_ACCESS_KEY_ID"],
         aws_secret_access_key=os.environ["S3_SECRET_ACCESS_KEY"],
     )
     bucket = s3.Bucket("voluseg-output")
-    bucket.upload_file("/data/output/cells0_clean.hdf5", url)
+    bucket.upload_file('/data/output_archive.zip', url)
+    
+    # Clean up the zip file
+    os.remove('/data/output_archive.zip')
 
 
 def clean_directory():
