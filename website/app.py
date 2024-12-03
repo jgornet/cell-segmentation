@@ -269,5 +269,21 @@ def download_file(bucket, filename):
 def internal_server_error(error):
     return jsonify({'error': f'Internal Server Error: {str(error)}\n{traceback.format_exc()}'}), 500
 
+@app.route('/task_error/<task_id>')
+@auth.login_required
+@limiter.limit("10 per minute")
+def get_task_error(task_id):
+    try:
+        task = celery.AsyncResult(task_id)
+        if task.state == 'FAILURE':
+            # Return the error information
+            return jsonify({
+                'error': str(task.result),  # The error message
+                'traceback': task.traceback  # The full traceback
+            })
+        return jsonify({'error': 'Task has not failed'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error retrieving task error: {str(e)}'}), 500
+
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)

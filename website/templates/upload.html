@@ -139,6 +139,9 @@
                                         <span class="badge badge-{{ 'success' if file_status[file] == 'Completed' else 'warning' if file_status[file] == 'Processing' else 'danger' if file_status[file] == 'Failed' else 'secondary' }}">
                                             {{ file_status[file] }}
                                         </span>
+                                        {% if file_status[file] == 'Failed' %}
+                                            <button class="btn btn-sm btn-danger ml-2 error-details-btn" data-task-id="{{ file }}">Error Details</button>
+                                        {% endif %}
                                         <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_INPUT'], filename=file) }}" class="btn btn-sm btn-primary ml-2">Download</a>
                                     </span>
                                 </li>
@@ -320,6 +323,9 @@
             }
             
             return files.map(function(file) {
+                const errorButton = file.status === 'Failed' ? 
+                    `<button class="btn btn-sm btn-danger ml-2 error-details-btn" data-task-id="${file.filename}">Error Details</button>` : '';
+                
                 return `
                     <li class="list-group-item d-flex justify-content-between align-items-center" data-filename="${file.filename}">
                         ${file.filename}
@@ -327,6 +333,7 @@
                             <span class="badge badge-${file.statusClass}">
                                 ${file.status}
                             </span>
+                            ${errorButton}
                             <a href="/download/${encodeURIComponent(file.filename)}?bucket={{ config['S3_BUCKET_INPUT'] }}" class="btn btn-sm btn-primary ml-2">Download</a>
                         </span>
                     </li>
@@ -387,7 +394,56 @@
                 themeToggle.html('🌙 Dark Mode');
             }
         });
+
+        // Add handler for error details button
+        $(document).on('click', '.error-details-btn', function() {
+            const taskId = $(this).data('task-id');
+            
+            // Show loading state
+            $('#errorDetails').html('Loading error details...');
+            $('#errorModal').modal('show');
+            
+            // Fetch error details
+            $.ajax({
+                url: `/task_error/${encodeURIComponent(taskId)}`,
+                method: 'GET',
+                success: function(response) {
+                    let errorText = 'Error Message:\n' + response.error;
+                    if (response.traceback) {
+                        errorText += '\n\nTraceback:\n' + response.traceback;
+                    }
+                    $('#errorDetails').text(errorText);
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Failed to load error details.';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMessage += '\n' + xhr.responseJSON.error;
+                    }
+                    $('#errorDetails').text(errorMessage);
+                }
+            });
+        });
     });
     </script>
+
+    <!-- Add this modal at the bottom of the body, before the scripts -->
+    <div class="modal fade" id="errorModal" tabindex="-1" role="dialog" aria-labelledby="errorModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="errorModalLabel">Task Error Details</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <pre id="errorDetails" style="white-space: pre-wrap;"></pre>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
