@@ -279,10 +279,10 @@
                 success: function(data) {
                     $('#status').html('Upload successful, processing started. Task ID: ' + data.task_id);
                     $('#error').html('');
-                    // Reload the page after successful upload
-                    setTimeout(function() {
-                        location.reload();
-                    }, 2000);
+                    // // Reload the page after successful upload
+                    // setTimeout(function() {
+                    //     location.reload();
+                    // }, 2000);
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
                     $('#error').html('Error completing multipart upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
