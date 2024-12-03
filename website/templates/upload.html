@@ -22,9 +22,13 @@
                 <h2 class="card-title text-center mb-4">Voluseg Data Processing - Upload File</h2>
                 <form id="upload-form">
                     <div class="form-group">
-                        <div class="custom-file">
+                        <div class="custom-file mb-3">
                             <input type="file" class="custom-file-input" id="file-input" required>
-                            <label class="custom-file-label" for="file-input">Choose file</label>
+                            <label class="custom-file-label" for="file-input">Choose data file</label>
+                        </div>
+                        <div class="custom-file">
+                            <input type="file" class="custom-file-input" id="parameters-input" accept=".json">
+                            <label class="custom-file-label" for="parameters-input">Choose parameters file (optional)</label>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary btn-block">Upload</button>
@@ -48,12 +52,25 @@
     $(document).ready(function () {
         bsCustomFileInput.init()
 
-        $('#upload-form').on('submit', function(e) {
+        $('#upload-form').on('submit', async function(e) {
             e.preventDefault();
             var file = document.getElementById('file-input').files[0];
+            var paramsFile = document.getElementById('parameters-input').files[0];
+            
             if (!file) {
                 $('#error').html('Please select a file to upload.');
                 return;
+            }
+
+            // Read parameters file if present
+            let parameters = null;
+            if (paramsFile) {
+                try {
+                    parameters = await paramsFile.text();
+                } catch (error) {
+                    $('#error').html('Error reading parameters file: ' + error);
+                    return;
+                }
             }
 
             // Get the pre-signed POST data
@@ -64,7 +81,8 @@
                 data: JSON.stringify({
                     fileName: file.name,
                     contentType: file.type,
-                    fileSize: file.size
+                    fileSize: file.size,
+                    parameters: parameters
                 }),
                 success: function(response) {
                     console.log('Server response:', response);

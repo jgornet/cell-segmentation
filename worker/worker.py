@@ -17,7 +17,7 @@ from config import celery
 
 
 @celery.task(bind=True, queue='tasks')
-def process_volume(self, url):
+def process_volume(self, url, parameters_json=None):
     self.update_state(task_id=url, state='STARTED')
     
     download_url = url
@@ -31,7 +31,7 @@ def process_volume(self, url):
     print("Converted tif to h5")
 
     print("Generating traces")
-    generate_traces()
+    generate_traces(parameters_json)
     print("Generated traces")
 
     print("Uploading traces")
@@ -90,29 +90,43 @@ def tif_to_h5(tif_path):
         prev_frame = next_frame
 
 
-def generate_traces():
+def generate_traces(custom_parameters=None):
+    
+
+    # If custom parameters were provided, overwrite the generated parameters file
+
     parameters = voluseg.parameter_dictionary()
+    
+    if custom_parameters:
+        c_parameters = loads(custom_parameters)
+        for key, value in c_parameters.items():
+            parameters[key] = value
+
+    else:
+        parameters["diam_cell"] = 5.0
+        parameters["f_volume"] = 1.0
+        parameters["t_section"] = 0.04
+        parameters["ds"] = 1
+        parameters["res_x"] = 0.585
+        parameters["res_y"] = 0.585
+        parameters["res_z"] = 25
+
     parameters["dir_ants"] = "/opt/ANTs/bin"
     parameters["dir_input"] = "/data/h5_volume"
     parameters["dir_output"] = "/data/output"
-    parameters["registration"] = "high"
-    parameters["diam_cell"] = 5.0
-    parameters["f_volume"] = 1.0  # 1/seconds per volume
-    parameters["t_section"] = 0.04  # number of seconds per volume/number of slices
-    parameters["ds"] = 1  # 1 means no downsampling
-    parameters["res_x"] = (
-        0.585  # 1.17 if binning by 2, voluseg/segmentation/sound_MT/20231107_huc_H2B_gcamp_sound_MT/fish1/output
-    )
-    parameters["res_y"] = 0.585
-    parameters["res_z"] = 25
 
     voluseg.step0_process_parameters(parameters)
 
+    # Now read the parameters file (either custom or generated)
     with open("/data/output/parameters.json", "r") as f:
         parameters = loads(f.read())
+
+    # sets directory parameters in json
+    
+
+    # Continue with processing
     voluseg.step1_process_volumes(parameters)
     voluseg.step2_align_volumes(parameters)
-
     parameters["volume_names"] = np.array(parameters["volume_names"])
     voluseg.step3_mask_volumes(parameters)
     voluseg.step4_detect_cells(parameters)

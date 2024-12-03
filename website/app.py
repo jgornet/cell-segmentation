@@ -168,8 +168,14 @@ def complete_multipart_upload():
             UploadId=data['uploadId'],
             MultipartUpload={'Parts': data['parts']}
         )
-        # Enqueue processing task
-        task = celery.send_task('worker.process_volume', args=[data['fileName']], task_id=data['fileName'], queue='tasks')
+        # Enqueue processing task with optional parameters
+        parameters = data.get('parameters')  # Will be None if not provided
+        task = celery.send_task(
+            'worker.process_volume',
+            args=[data['fileName'], parameters],
+            task_id=data['fileName'],
+            queue='tasks'
+        )
         return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
