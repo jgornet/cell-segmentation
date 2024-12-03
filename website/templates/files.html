@@ -10,6 +10,29 @@
         body { background-color: #f8f9fa; }
         .container { max-width: 800px; margin-top: 50px; }
         .card { border: none; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .scrollable-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(0,0,0,.125);
+            border-radius: .25rem;
+        }
+        .search-box {
+            margin-bottom: 10px;
+        }
+        /* Style for webkit browsers */
+        .scrollable-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scrollable-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .scrollable-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .scrollable-list::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     </style>
 </head>
 <body>
@@ -34,33 +57,39 @@
                 </ul>
 
                 <h3>Input Files</h3>
-                <ul class="list-group mb-4">
-                    {% for file in input_files %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ file }}
-                            <span>
-                                <span class="badge badge-{{ 'success' if file_status[file] == 'Completed' else 'warning' if file_status[file] == 'Processing' else 'danger' if file_status[file] == 'Failed' else 'secondary' }}">
-                                    {{ file_status[file] }}
+                <input type="text" class="form-control search-box" id="inputSearch" placeholder="Search input files...">
+                <div class="scrollable-list mb-4">
+                    <ul class="list-group" id="inputFilesList">
+                        {% for file in input_files %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ file }}
+                                <span>
+                                    <span class="badge badge-{{ 'success' if file_status[file] == 'Completed' else 'warning' if file_status[file] == 'Processing' else 'danger' if file_status[file] == 'Failed' else 'secondary' }}">
+                                        {{ file_status[file] }}
+                                    </span>
+                                    <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_INPUT'], filename=file) }}" class="btn btn-sm btn-primary ml-2">Download</a>
                                 </span>
-                                <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_INPUT'], filename=file) }}" class="btn btn-sm btn-primary ml-2">Download</a>
-                            </span>
-                        </li>
-                    {% else %}
-                        <li class="list-group-item">No input files</li>
-                    {% endfor %}
-                </ul>
+                            </li>
+                        {% else %}
+                            <li class="list-group-item">No input files</li>
+                        {% endfor %}
+                    </ul>
+                </div>
 
                 <h3>Output Files</h3>
-                <ul class="list-group">
-                    {% for file in output_files %}
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            {{ file }}
-                            <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_OUTPUT'], filename=file) }}" class="btn btn-sm btn-primary">Download</a>
-                        </li>
-                    {% else %}
-                        <li class="list-group-item">No output files</li>
-                    {% endfor %}
-                </ul>
+                <input type="text" class="form-control search-box" id="outputSearch" placeholder="Search output files...">
+                <div class="scrollable-list">
+                    <ul class="list-group" id="outputFilesList">
+                        {% for file in output_files %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ file }}
+                                <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_OUTPUT'], filename=file) }}" class="btn btn-sm btn-primary">Download</a>
+                            </li>
+                        {% else %}
+                            <li class="list-group-item">No output files</li>
+                        {% endfor %}
+                    </ul>
+                </div>
                 
                 <div class="mt-4">
                     <a href="{{ url_for('upload_form') }}" class="btn btn-outline-secondary btn-sm">Upload New File</a>
@@ -76,6 +105,22 @@
             if (errorMessage) {
                 $('#error').text(errorMessage).show();
             }
+
+            // Search functionality for input files
+            $("#inputSearch").on("keyup", function() {
+                var value = $(this).val().toLowerCase();
+                $("#inputFilesList li").filter(function() {
+                    $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+                });
+            });
+
+            // Search functionality for output files
+            $("#outputSearch").on("keyup", function() {
+                var value = $(this).val().toLowerCase();
+                $("#outputFilesList li").filter(function() {
+                    $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+                });
+            });
         });
     </script>
 </body>
