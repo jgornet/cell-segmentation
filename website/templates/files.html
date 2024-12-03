@@ -104,7 +104,7 @@
     <script>
         $(document).ready(function() {
             // Safely handle error message from server
-            var errorMessage = {{ error|tojson if error else 'null' }};
+            var errorMessage = "{{ error|default('')|tojson|safe }}";
             if (errorMessage) {
                 $('#error').text(errorMessage).show();
             }
@@ -112,17 +112,18 @@
             // Search functionality for input files
             $("#inputSearch").on("input", function() {
                 var searchText = $(this).val().toLowerCase();
-                console.log("Searching for:", searchText);
-
+                
                 $("#inputFilesList li").each(function() {
                     var $li = $(this);
                     if (!$li.hasClass('no-files')) {
-                        var fileText = $li.first().contents().first().text().trim().toLowerCase();
-                        console.log("File text:", fileText);
+                        var fileText = $li.contents().filter(function() {
+                            return this.nodeType === 3;
+                        }).text().trim().toLowerCase();
+                        
                         if (fileText.includes(searchText)) {
-                            $li.show();
+                            $li.css('display', 'flex'); // Use flex to maintain the layout
                         } else {
-                            $li.hide();
+                            $li.css('display', 'none');
                         }
                     }
                 });
@@ -131,14 +132,18 @@
             // Search functionality for output files
             $("#outputSearch").on("input", function() {
                 var searchText = $(this).val().toLowerCase();
+                
                 $("#outputFilesList li").each(function() {
                     var $li = $(this);
                     if (!$li.hasClass('no-files')) {
-                        var fileText = $li.first().contents().first().text().trim().toLowerCase();
+                        var fileText = $li.contents().filter(function() {
+                            return this.nodeType === 3;
+                        }).text().trim().toLowerCase();
+                        
                         if (fileText.includes(searchText)) {
-                            $li.show();
+                            $li.css('display', 'flex');
                         } else {
-                            $li.hide();
+                            $li.css('display', 'none');
                         }
                     }
                 });
