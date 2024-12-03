@@ -112,41 +112,45 @@
             // Search functionality for input files
             $("#inputSearch").on("input", function() {
                 var searchText = $(this).val().toLowerCase();
+                var hasVisibleItems = false;
                 
-                $("#inputFilesList li").each(function() {
+                $("#inputFilesList li:not(.no-files)").each(function() {
                     var $li = $(this);
-                    if (!$li.hasClass('no-files')) {
-                        var fileText = $li.contents().filter(function() {
-                            return this.nodeType === 3;
-                        }).text().trim().toLowerCase();
-                        
-                        if (fileText.includes(searchText)) {
-                            $li.css('display', 'flex'); // Use flex to maintain the layout
-                        } else {
-                            $li.css('display', 'none');
-                        }
+                    // Get the first text content before any spans or other elements
+                    var fileText = $li.clone().children().remove().end().text().trim().toLowerCase();
+                    
+                    if (fileText.includes(searchText)) {
+                        $li.css('display', 'flex');
+                        hasVisibleItems = true;
+                    } else {
+                        $li.css('display', 'none');
                     }
                 });
+
+                // Show/hide the "No matching files found" message
+                $("#inputFilesList .no-files").css('display', hasVisibleItems ? 'none' : 'block');
             });
 
             // Search functionality for output files
             $("#outputSearch").on("input", function() {
                 var searchText = $(this).val().toLowerCase();
+                var hasVisibleItems = false;
                 
-                $("#outputFilesList li").each(function() {
+                $("#outputFilesList li:not(.no-files)").each(function() {
                     var $li = $(this);
-                    if (!$li.hasClass('no-files')) {
-                        var fileText = $li.contents().filter(function() {
-                            return this.nodeType === 3;
-                        }).text().trim().toLowerCase();
-                        
-                        if (fileText.includes(searchText)) {
-                            $li.css('display', 'flex');
-                        } else {
-                            $li.css('display', 'none');
-                        }
+                    // Get the first text content before any spans or other elements
+                    var fileText = $li.clone().children().remove().end().text().trim().toLowerCase();
+                    
+                    if (fileText.includes(searchText)) {
+                        $li.css('display', 'flex');
+                        hasVisibleItems = true;
+                    } else {
+                        $li.css('display', 'none');
                     }
                 });
+
+                // Show/hide the "No matching files found" message
+                $("#outputFilesList .no-files").css('display', hasVisibleItems ? 'none' : 'block');
             });
         });
     </script>
