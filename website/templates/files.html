@@ -62,7 +62,7 @@
                     <ul class="list-group" id="inputFilesList">
                         {% if input_files %}
                             {% for file in input_files %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <li class="list-group-item d-flex justify-content-between align-items-center" data-filename="{{ file }}">
                                     {{ file }}
                                     <span>
                                         <span class="badge badge-{{ 'success' if file_status[file] == 'Completed' else 'warning' if file_status[file] == 'Processing' else 'danger' if file_status[file] == 'Failed' else 'secondary' }}">
@@ -116,16 +116,15 @@
                 
                 $("#inputFilesList li:not(.no-files)").each(function() {
                     var $li = $(this);
-                    // Get the first text content before any spans or other elements
-                    var fileText = $li.clone().children().remove().end().text().trim().toLowerCase();
+                    var fileText = $li.data('filename').toLowerCase();
                     
                     if (fileText.includes(searchText)) {
-                        console.log('Match found:', fileText);
-                        $li.removeClass('d-none');
+                        console.log('Match found:', fileText, '- Showing:', $li);
+                        $li.show();
                         hasVisibleItems = true;
                     } else {
-                        console.log('No match for:', fileText);
-                        $li.addClass('d-none');
+                        console.log('No match for:', fileText, '- Hiding:', $li);
+                        $li.hide();
                     }
                 });
 
@@ -144,16 +143,15 @@
                 
                 $("#outputFilesList li:not(.no-files)").each(function() {
                     var $li = $(this);
-                    // Get the first text content before any spans or other elements
-                    var fileText = $li.clone().children().remove().end().text().trim().toLowerCase();
+                    var fileText = $li.data('filename').toLowerCase();
                     
                     if (fileText.includes(searchText)) {
-                        console.log('Match found:', fileText);
-                        $li.removeClass('d-none');
+                        console.log('Match found:', fileText, '- Showing:', $li);
+                        $li.show();
                         hasVisibleItems = true;
                     } else {
-                        console.log('No match for:', fileText);
-                        $li.addClass('d-none');
+                        console.log('No match for:', fileText, '- Hiding:', $li);
+                        $li.hide();
                     }
                 });
 
