@@ -36,6 +36,7 @@ RUN pip install \
     findspark \
     boto3 \
     celery[redis]
+    
 
 COPY worker /worker
 
