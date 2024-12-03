@@ -109,56 +109,84 @@
                 $('#error').text(errorMessage).show();
             }
 
+            // Store original files arrays
+            var originalInputFiles = [];
+            var originalOutputFiles = [];
+            
+            // Populate original arrays on page load
+            $("#inputFilesList li:not(.no-files)").each(function() {
+                var file = $(this).data('filename');
+                var status = $(this).find('.badge').text().trim();
+                originalInputFiles.push({
+                    filename: file,
+                    status: status,
+                    statusClass: $(this).find('.badge').attr('class').split('badge-')[1]
+                });
+            });
+            
+            $("#outputFilesList li:not(.no-files)").each(function() {
+                originalOutputFiles.push($(this).data('filename'));
+            });
+            
+            // Function to generate HTML for input files
+            function generateInputListHTML(files) {
+                if (files.length === 0) {
+                    return '<li class="list-group-item no-files">No matching files found</li>';
+                }
+                
+                return files.map(function(file) {
+                    return `
+                        <li class="list-group-item d-flex justify-content-between align-items-center" data-filename="${file.filename}">
+                            ${file.filename}
+                            <span>
+                                <span class="badge badge-${file.statusClass}">
+                                    ${file.status}
+                                </span>
+                                <a href="/download/${encodeURIComponent(file.filename)}?bucket={{ config['S3_BUCKET_INPUT'] }}" class="btn btn-sm btn-primary ml-2">Download</a>
+                            </span>
+                        </li>
+                    `;
+                }).join('');
+            }
+            
+            // Function to generate HTML for output files
+            function generateOutputListHTML(files) {
+                if (files.length === 0) {
+                    return '<li class="list-group-item no-files">No matching files found</li>';
+                }
+                
+                return files.map(function(filename) {
+                    return `
+                        <li class="list-group-item d-flex justify-content-between align-items-center" data-filename="${filename}">
+                            ${filename}
+                            <a href="/download/${encodeURIComponent(filename)}?bucket={{ config['S3_BUCKET_OUTPUT'] }}" class="btn btn-sm btn-primary">Download</a>
+                        </li>
+                    `;
+                }).join('');
+            }
+
             // Search functionality for input files
             $("#inputSearch").on("input", function() {
                 var searchText = $(this).val().toLowerCase();
-                var hasVisibleItems = false;
-                
-                $("#inputFilesList li:not(.no-files)").each(function() {
-                    var fileText = $(this).data('filename').toLowerCase();
-                    
-                    if (fileText.includes(searchText)) {
-                        console.log('Match found:', fileText);
-                        $(this).removeClass('d-none');
-                        hasVisibleItems = true;
-                    } else {
-                        console.log('No match for:', fileText);
-                        $(this).addClass('d-none');
-                    }
+                // Filter files based on search text
+                var filteredFiles = originalInputFiles.filter(function(file) {
+                    return file.filename.toLowerCase().includes(searchText);
                 });
-
-                // Show/hide the "No matching files found" message
-                if (hasVisibleItems) {
-                    $("#inputFilesList .no-files").addClass('d-none');
-                } else {
-                    $("#inputFilesList .no-files").removeClass('d-none');
-                }
+                
+                // Generate and set new HTML
+                $("#inputFilesList").html(generateInputListHTML(filteredFiles));
             });
 
             // Search functionality for output files
             $("#outputSearch").on("input", function() {
                 var searchText = $(this).val().toLowerCase();
-                var hasVisibleItems = false;
-                
-                $("#outputFilesList li:not(.no-files)").each(function() {
-                    var fileText = $(this).data('filename').toLowerCase();
-                    
-                    if (fileText.includes(searchText)) {
-                        console.log('Match found:', fileText);
-                        $(this).removeClass('d-none');
-                        hasVisibleItems = true;
-                    } else {
-                        console.log('No match for:', fileText);
-                        $(this).addClass('d-none');
-                    }
+                // Filter files based on search text
+                var filteredFiles = originalOutputFiles.filter(function(filename) {
+                    return filename.toLowerCase().includes(searchText);
                 });
-
-                // Show/hide the "No matching files found" message
-                if (hasVisibleItems) {
-                    $("#outputFilesList .no-files").addClass('d-none');
-                } else {
-                    $("#outputFilesList .no-files").removeClass('d-none');
-                }
+                
+                // Generate and set new HTML
+                $("#outputFilesList").html(generateOutputListHTML(filteredFiles));
             });
         });
     </script>
