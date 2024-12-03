@@ -47,11 +47,9 @@ REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis-service:6380/0')
 celery = Celery(
     "tasks",
     broker=RABBITMQ_URL,
-    # broker_use_ssl=use_ssl,
     backend=REDIS_URL,
-    # redis_backend_use_ssl=use_ssl,
     task_compression="gzip",
-    task_track_started=True,  # by default does not report this granularly
+    task_track_started=True,
     task_acks_late=False,
     task_acks_on_failure_or_timeout=True,
     worker_cancel_long_running_tasks_on_connection_loss=False,

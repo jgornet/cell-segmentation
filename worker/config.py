@@ -9,7 +9,7 @@ REDIS_URL = os.environ["REDIS_URL"]
 
 celery = Celery(
     "tasks",
-    broker=REDIS_URL,
+    broker=RABBITMQ_URL,
     backend=REDIS_URL,
     task_compression="gzip",
     task_track_started=True,  # by default does not report this granularly
