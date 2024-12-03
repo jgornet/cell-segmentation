@@ -109,16 +109,18 @@
             // Search functionality for input files
             $("#inputSearch").on("keyup", function() {
                 var value = $(this).val().toLowerCase();
-                $("#inputFilesList li").filter(function() {
-                    $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+                $("#inputFilesList li").each(function() {
+                    var text = $(this).text().toLowerCase();
+                    $(this).toggle(text.includes(value));
                 });
             });
 
             // Search functionality for output files
             $("#outputSearch").on("keyup", function() {
                 var value = $(this).val().toLowerCase();
-                $("#outputFilesList li").filter(function() {
-                    $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+                $("#outputFilesList li").each(function() {
+                    var text = $(this).text().toLowerCase();
+                    $(this).toggle(text.includes(value));
                 });
             });
         });
