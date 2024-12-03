@@ -31,7 +31,7 @@ def process_volume(self, url, parameters_json=None):
     print("Converted tif to h5")
 
     print("Generating traces")
-    generate_traces(parameters_json)
+    generate_output(parameters_json)
     print("Generated traces")
 
     print("Uploading traces")
@@ -90,19 +90,20 @@ def tif_to_h5(tif_path):
         prev_frame = next_frame
 
 
-def generate_traces(custom_parameters=None):
+def generate_output(custom_parameters=None):
     
 
     # If custom parameters were provided, overwrite the generated parameters file
 
     parameters = voluseg.parameter_dictionary()
-    
+
     if custom_parameters:
         c_parameters = loads(custom_parameters)
         for key, value in c_parameters.items():
             parameters[key] = value
 
     else:
+        parameters["registration"] = "high"
         parameters["diam_cell"] = 5.0
         parameters["f_volume"] = 1.0
         parameters["t_section"] = 0.04
