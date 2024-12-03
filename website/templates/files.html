@@ -125,14 +125,15 @@
             // Search functionality for input files
             $("#inputSearch").on("keyup", function() {
                 var value = $(this).val().toLowerCase();
-                console.log("Searching for:", value);
-                console.log("Number of items:", $("#inputFilesList li").length);
-                
                 $("#inputFilesList li").each(function() {
-                    var text = $(this).text().toLowerCase();
-                    var shouldShow = text.includes(value);
-                    console.log("Item text:", text, "Should show:", shouldShow);
-                    $(this).toggle(shouldShow);
+                    // Get only the filename text, excluding buttons and badges
+                    var text = $(this).clone()    //clone the element
+                        .children()               //select all children
+                        .remove()                 //remove all children
+                        .end()                    //go back to selected element
+                        .text()                   //get the text
+                        .trim().toLowerCase();
+                    $(this).toggle(text.includes(value));
                 });
             });
 
@@ -140,7 +141,12 @@
             $("#outputSearch").on("keyup", function() {
                 var value = $(this).val().toLowerCase();
                 $("#outputFilesList li").each(function() {
-                    var text = $(this).text().toLowerCase();
+                    var text = $(this).clone()
+                        .children()
+                        .remove()
+                        .end()
+                        .text()
+                        .trim().toLowerCase();
                     $(this).toggle(text.includes(value));
                 });
             });
