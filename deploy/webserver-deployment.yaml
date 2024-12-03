@@ -20,6 +20,11 @@ spec:
         ports:
         - containerPort: 5000
         env:
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: webserver-credentials
+              key: PASSWORD
         - name: S3_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:

@@ -80,7 +80,7 @@ except NoCredentialsError:
 
 # User credentials (replace with your own secure method)
 users = {
-    "labuser": generate_password_hash("i2bh308sdf325u2iuh1922hd319ibfoiub82b82u329h8f48g28feubf38345673fojiw")
+    "labuser": generate_password_hash(os.environ['PASSWORD'])
 }
 
 @auth.verify_password
