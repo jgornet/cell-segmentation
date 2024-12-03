@@ -60,35 +60,20 @@
                 <input type="text" class="form-control search-box" id="inputSearch" placeholder="Search input files...">
                 <div class="scrollable-list mb-4">
                     <ul class="list-group" id="inputFilesList">
-                        <!-- Test items -->
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            test_file_1.txt
-                            <span>
-                                <span class="badge badge-success">Completed</span>
-                                <a href="#" class="btn btn-sm btn-primary ml-2">Download</a>
-                            </span>
-                        </li>
-                        <li class="list-group-item d-flex justify-content-between align-items-center">
-                            another_file_2.txt
-                            <span>
-                                <span class="badge badge-success">Completed</span>
-                                <a href="#" class="btn btn-sm btn-primary ml-2">Download</a>
-                            </span>
-                        </li>
-                        <!-- End test items -->
-                        {% for file in input_files %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                {{ file }}
-                                <span>
-                                    <span class="badge badge-{{ 'success' if file_status[file] == 'Completed' else 'warning' if file_status[file] == 'Processing' else 'danger' if file_status[file] == 'Failed' else 'secondary' }}">
-                                        {{ file_status[file] }}
+                        {% if input_files %}
+                            {% for file in input_files %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ file }}
+                                    <span>
+                                        <span class="badge badge-{{ 'success' if file_status[file] == 'Completed' else 'warning' if file_status[file] == 'Processing' else 'danger' if file_status[file] == 'Failed' else 'secondary' }}">
+                                            {{ file_status[file] }}
+                                        </span>
+                                        <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_INPUT'], filename=file) }}" class="btn btn-sm btn-primary ml-2">Download</a>
                                     </span>
-                                    <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_INPUT'], filename=file) }}" class="btn btn-sm btn-primary ml-2">Download</a>
-                                </span>
-                            </li>
-                        {% else %}
-                            <li class="list-group-item">No input files</li>
-                        {% endfor %}
+                                </li>
+                            {% endfor %}
+                        {% endif %}
+                        <li class="list-group-item no-files" style="display: none;">No matching files found</li>
                     </ul>
                 </div>
 
@@ -96,14 +81,15 @@
                 <input type="text" class="form-control search-box" id="outputSearch" placeholder="Search output files...">
                 <div class="scrollable-list">
                     <ul class="list-group" id="outputFilesList">
-                        {% for file in output_files %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                {{ file }}
-                                <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_OUTPUT'], filename=file) }}" class="btn btn-sm btn-primary">Download</a>
-                            </li>
-                        {% else %}
-                            <li class="list-group-item">No output files</li>
-                        {% endfor %}
+                        {% if output_files %}
+                            {% for file in output_files %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    {{ file }}
+                                    <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_OUTPUT'], filename=file) }}" class="btn btn-sm btn-primary">Download</a>
+                                </li>
+                            {% endfor %}
+                        {% endif %}
+                        <li class="list-group-item no-files" style="display: none;">No matching files found</li>
                     </ul>
                 </div>
                 
@@ -122,34 +108,42 @@
                 $('#error').text(errorMessage).show();
             }
 
-            // Search functionality for input files
-            $("#inputSearch").on("keyup", function() {
-                var value = $(this).val().toLowerCase();
-                $("#inputFilesList li").each(function() {
-                    // Get only the filename text, excluding buttons and badges
-                    var text = $(this).clone()    //clone the element
-                        .children()               //select all children
-                        .remove()                 //remove all children
-                        .end()                    //go back to selected element
-                        .text()                   //get the text
-                        .trim().toLowerCase();
-                    $(this).toggle(text.includes(value));
-                });
-            });
+            function updateList(searchValue, listId) {
+                var $list = $("#" + listId);
+                var $items = $list.find("li:not(.no-files)");
+                var visibleCount = 0;
 
-            // Search functionality for output files
-            $("#outputSearch").on("keyup", function() {
-                var value = $(this).val().toLowerCase();
-                $("#outputFilesList li").each(function() {
+                $items.each(function() {
                     var text = $(this).clone()
                         .children()
                         .remove()
                         .end()
                         .text()
                         .trim().toLowerCase();
-                    $(this).toggle(text.includes(value));
+                    
+                    var shouldShow = text.includes(searchValue.toLowerCase());
+                    $(this).toggle(shouldShow);
+                    if (shouldShow) visibleCount++;
                 });
+
+                // Show/hide the 
+                "No matching files found" message
+                $list.find(".no-files").toggle(visibleCount === 0);
+            }
+
+            // Search functionality for input files
+            $("#inputSearch").on("keyup", function() {
+                updateList($(this).val(), "inputFilesList");
             });
+
+            // Search functionality for output files
+            $("#outputSearch").on("keyup", function() {
+                updateList($(this).val(), "outputFilesList");
+            });
+
+            // Initial check for empty lists
+            updateList("", "inputFilesList");
+            updateList("", "outputFilesList");
         });
     </script>
 </body>
