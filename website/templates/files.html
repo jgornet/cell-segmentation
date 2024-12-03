@@ -120,15 +120,21 @@
                     var fileText = $li.clone().children().remove().end().text().trim().toLowerCase();
                     
                     if (fileText.includes(searchText)) {
-                        $li.css('display', 'flex');
+                        console.log('Match found:', fileText);
+                        $li.removeClass('d-none');
                         hasVisibleItems = true;
                     } else {
-                        $li.css('display', 'none');
+                        console.log('No match for:', fileText);
+                        $li.addClass('d-none');
                     }
                 });
 
                 // Show/hide the "No matching files found" message
-                $("#inputFilesList .no-files").css('display', hasVisibleItems ? 'none' : 'block');
+                if (hasVisibleItems) {
+                    $("#inputFilesList .no-files").hide();
+                } else {
+                    $("#inputFilesList .no-files").show();
+                }
             });
 
             // Search functionality for output files
@@ -142,15 +148,21 @@
                     var fileText = $li.clone().children().remove().end().text().trim().toLowerCase();
                     
                     if (fileText.includes(searchText)) {
-                        $li.css('display', 'flex');
+                        console.log('Match found:', fileText);
+                        $li.removeClass('d-none');
                         hasVisibleItems = true;
                     } else {
-                        $li.css('display', 'none');
+                        console.log('No match for:', fileText);
+                        $li.addClass('d-none');
                     }
                 });
 
                 // Show/hide the "No matching files found" message
-                $("#outputFilesList .no-files").css('display', hasVisibleItems ? 'none' : 'block');
+                if (hasVisibleItems) {
+                    $("#outputFilesList .no-files").hide();
+                } else {
+                    $("#outputFilesList .no-files").show();
+                }
             });
         });
     </script>
