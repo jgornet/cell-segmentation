@@ -174,7 +174,6 @@ def complete_multipart_upload():
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
 
-
 @app.route('/files')
 @auth.login_required
 @limiter.limit("10 per minute")

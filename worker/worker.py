@@ -38,7 +38,7 @@ def process_volume(self, url):
     fn = os.path.splitext(url)[0]
     upload_url = f"{fn}.zip"
     upload_output(upload_url)
-    print("Uploaded traces")
+    print("Uploaded output")
 
     clean_directory()
 
