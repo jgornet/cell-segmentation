@@ -35,9 +35,58 @@
         .scrollable-list::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
+
+        /* Dark theme styles */
+        body.dark-theme {
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+
+        .dark-theme .card {
+            background-color: #2d2d2d;
+            box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        }
+
+        .dark-theme .list-group-item {
+            background-color: #2d2d2d;
+            border-color: #404040;
+            color: #ffffff;
+        }
+
+        .dark-theme .form-control {
+            background-color: #404040;
+            border-color: #505050;
+            color: #ffffff;
+        }
+
+        .dark-theme .form-control:focus {
+            background-color: #404040;
+            color: #ffffff;
+        }
+
+        /* Theme toggle button styles */
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 2px solid #007bff;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .dark-theme .theme-toggle {
+            background-color: #2d2d2d;
+            border-color: #007bff;
+        }
     </style>
 </head>
 <body>
+    <button class="theme-toggle" id="themeToggle">🌙 Dark Mode</button>
     <!-- Title Section -->
     <div class="container">
         <h1 class="text-center mb-4">Voluseg Data Processing</h1>
@@ -310,6 +359,29 @@
                 return filename.toLowerCase().includes(searchText);
             });
             $("#outputFilesList").html(generateOutputListHTML(filteredFiles));
+        });
+
+        // Theme handling
+        const themeToggle = $('#themeToggle');
+        const body = $('body');
+        
+        // Check for saved theme preference
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            body.addClass('dark-theme');
+            themeToggle.html('☀️ Light Mode');
+        }
+
+        // Theme toggle handler
+        themeToggle.on('click', function() {
+            body.toggleClass('dark-theme');
+            if (body.hasClass('dark-theme')) {
+                localStorage.setItem('theme', 'dark');
+                themeToggle.html('☀️ Light Mode');
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeToggle.html('🌙 Dark Mode');
+            }
         });
     });
     </script>
