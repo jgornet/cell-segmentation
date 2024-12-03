@@ -103,7 +103,8 @@
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script>
         $(document).ready(function() {
-            var errorMessage = "{{ error }}";
+            // Fix error message handling
+            var errorMessage = {% if error %}"{{ error|e }}"{% else %}null{% endif %};
             if (errorMessage) {
                 $('#error').text(errorMessage).show();
             }
@@ -126,8 +127,7 @@
                     if (shouldShow) visibleCount++;
                 });
 
-                // Show/hide the 
-                "No matching files found" message
+                // Show/hide the "No matching files found" message
                 $list.find(".no-files").toggle(visibleCount === 0);
             }
 
