@@ -4,22 +4,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voluseg Data Processing - Upload File</title>
+    <title>Voluseg Data Processing</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #f8f9fa; }
         .container { max-width: 800px; margin-top: 50px; }
-        .card { border: none; box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .card { border: none; box-shadow: 0 0 20px rgba(0,0,0,0.1); margin-bottom: 30px; }
         .progress { height: 25px; }
         .btn-primary { background-color: #007bff; border-color: #007bff; }
         .btn-primary:hover { background-color: #0056b3; border-color: #0056b3; }
+        .scrollable-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid rgba(0,0,0,.125);
+            border-radius: .25rem;
+        }
+        .search-box {
+            margin-bottom: 10px;
+        }
+        .scrollable-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scrollable-list::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .scrollable-list::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .scrollable-list::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Upload Section -->
         <div class="card">
             <div class="card-body">
-                <h2 class="card-title text-center mb-4">Voluseg Data Processing - Upload File</h2>
+                <h2 class="card-title text-center mb-4">Upload File</h2>
                 <form id="upload-form">
                     <div class="form-group">
                         <div class="custom-file mb-3">
@@ -38,8 +61,50 @@
                 </div>
                 <div id="status" class="mt-3"></div>
                 <div id="error" class="mt-3 text-danger"></div>
-                <div class="mt-4">
-                    <a href="{{ url_for('list_files') }}" class="btn btn-outline-secondary btn-sm">View Input/Output Files and Processing Status</a>
+            </div>
+        </div>
+
+        <!-- Files Section -->
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">Files</h2>
+                <div id="error" class="alert alert-danger" style="display: none;"></div>
+                
+                <h3>Input Files</h3>
+                <input type="text" class="form-control search-box" id="inputSearch" placeholder="Search input files...">
+                <div class="scrollable-list mb-4">
+                    <ul class="list-group" id="inputFilesList">
+                        {% if input_files %}
+                            {% for file in input_files %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center" data-filename="{{ file }}">
+                                    {{ file }}
+                                    <span>
+                                        <span class="badge badge-{{ 'success' if file_status[file] == 'Completed' else 'warning' if file_status[file] == 'Processing' else 'danger' if file_status[file] == 'Failed' else 'secondary' }}">
+                                            {{ file_status[file] }}
+                                        </span>
+                                        <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_INPUT'], filename=file) }}" class="btn btn-sm btn-primary ml-2">Download</a>
+                                    </span>
+                                </li>
+                            {% endfor %}
+                        {% endif %}
+                        <li class="list-group-item no-files" style="display: none;">No matching files found</li>
+                    </ul>
+                </div>
+
+                <h3>Output Files</h3>
+                <input type="text" class="form-control search-box" id="outputSearch" placeholder="Search output files...">
+                <div class="scrollable-list">
+                    <ul class="list-group" id="outputFilesList">
+                        {% if output_files %}
+                            {% for file in output_files %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center" data-filename="{{ file }}">
+                                    {{ file }}
+                                    <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_OUTPUT'], filename=file) }}" class="btn btn-sm btn-primary">Download</a>
+                                </li>
+                            {% endfor %}
+                        {% endif %}
+                        <li class="list-group-item no-files" style="display: none;">No matching files found</li>
+                    </ul>
                 </div>
             </div>
         </div>
@@ -49,9 +114,11 @@
     <script src="https://cdn.jsdelivr.net/npm/bs-custom-file-input/dist/bs-custom-file-input.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
     <script>
-    $(document).ready(function () {
-        bsCustomFileInput.init()
+    $(document).ready(function() {
+        // Initialize the file input plugin
+        bsCustomFileInput.init();
 
+        // Upload form handling
         $('#upload-form').on('submit', async function(e) {
             e.preventDefault();
             var file = document.getElementById('file-input').files[0];
@@ -62,7 +129,6 @@
                 return;
             }
 
-            // Read parameters file if present
             let parameters = null;
             if (paramsFile) {
                 try {
@@ -73,7 +139,6 @@
                 }
             }
 
-            // Get the pre-signed POST data
             $.ajax({
                 url: "{{ url_for('get_upload_url') }}",
                 type: 'POST',
@@ -123,7 +188,7 @@
                     type: 'PUT',
                     data: blob,
                     processData: false,
-                    contentType: false,  // Change this line
+                    contentType: false,
                     success: function(data, status, xhr) {
                         parts.push({
                             PartNumber: partNumber,
@@ -136,12 +201,7 @@
                         }
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
-                        console.error('Error details:', {
-                            status: jqXHR.status,
-                            statusText: jqXHR.statusText,
-                            responseText: jqXHR.responseText
-                        });
-                        $('#error').html('Error uploading part ' + partNumber + ' to S3: ' + errorThrown + '. Status: ' + jqXHR.status + ' ' + jqXHR.statusText);
+                        $('#error').html('Error uploading part ' + partNumber + ' to S3: ' + errorThrown);
                     }
                 });
             }
@@ -162,12 +222,91 @@
                 success: function(data) {
                     $('#status').html('Upload successful, processing started. Task ID: ' + data.task_id);
                     $('#error').html('');
+                    // Reload the page after successful upload
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
                     $('#error').html('Error completing multipart upload: ' + (jqXHR.responseJSON ? jqXHR.responseJSON.error : errorThrown));
                 }
             });
         }
+
+        // Files section handling
+        var errorMessage = {{ error|tojson|safe if error else 'null' }};
+        if (errorMessage && errorMessage !== null) {
+            $('#error').text(errorMessage).show();
+        }
+
+        // Store original files arrays
+        var originalInputFiles = [];
+        var originalOutputFiles = [];
+        
+        $("#inputFilesList li:not(.no-files)").each(function() {
+            var file = $(this).data('filename');
+            var status = $(this).find('.badge').text().trim();
+            originalInputFiles.push({
+                filename: file,
+                status: status,
+                statusClass: $(this).find('.badge').attr('class').split('badge-')[1]
+            });
+        });
+        
+        $("#outputFilesList li:not(.no-files)").each(function() {
+            originalOutputFiles.push($(this).data('filename'));
+        });
+        
+        function generateInputListHTML(files) {
+            if (files.length === 0) {
+                return '<li class="list-group-item no-files">No matching files found</li>';
+            }
+            
+            return files.map(function(file) {
+                return `
+                    <li class="list-group-item d-flex justify-content-between align-items-center" data-filename="${file.filename}">
+                        ${file.filename}
+                        <span>
+                            <span class="badge badge-${file.statusClass}">
+                                ${file.status}
+                            </span>
+                            <a href="/download/${encodeURIComponent(file.filename)}?bucket={{ config['S3_BUCKET_INPUT'] }}" class="btn btn-sm btn-primary ml-2">Download</a>
+                        </span>
+                    </li>
+                `;
+            }).join('');
+        }
+        
+        function generateOutputListHTML(files) {
+            if (files.length === 0) {
+                return '<li class="list-group-item no-files">No matching files found</li>';
+            }
+            
+            return files.map(function(filename) {
+                return `
+                    <li class="list-group-item d-flex justify-content-between align-items-center" data-filename="${filename}">
+                        ${filename}
+                        <a href="/download/${encodeURIComponent(filename)}?bucket={{ config['S3_BUCKET_OUTPUT'] }}" class="btn btn-sm btn-primary">Download</a>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        $("#inputSearch").on("input", function() {
+            var searchText = $(this).val().toLowerCase();
+            var filteredFiles = originalInputFiles.filter(function(file) {
+                return file.filename.toLowerCase().includes(searchText);
+            });
+            $("#inputFilesList").html(generateInputListHTML(filteredFiles));
+        });
+
+        $("#outputSearch").on("input", function() {
+            var searchText = $(this).val().toLowerCase();
+            var filteredFiles = originalOutputFiles.filter(function(filename) {
+                return filename.toLowerCase().includes(searchText);
+            });
+            $("#outputFilesList").html(generateOutputListHTML(filteredFiles));
+        });
     });
     </script>
 </body>

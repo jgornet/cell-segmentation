@@ -96,7 +96,62 @@ def auth_error(status):
 @auth.login_required
 @limiter.limit("10 per minute")
 def upload_form():
-    return render_template('upload.html')
+    if not s3_resource:
+        return jsonify({'error': 'S3 resource not initialized. Check AWS credentials.'}), 500
+    
+    try:
+        input_bucket = s3_resource.Bucket(app.config['S3_BUCKET_INPUT'])
+        output_bucket = s3_resource.Bucket(app.config['S3_BUCKET_OUTPUT'])
+        
+        input_files = [obj.key for obj in input_bucket.objects.all()]
+        output_files = [obj.key for obj in output_bucket.objects.all()]
+        
+        # Get processing status for input files
+        file_status = {}
+        for filename in input_files:
+            # Check if there's a corresponding output file
+            filename_base = os.path.splitext(filename)[0]
+            has_output = any(out_file.startswith(filename_base) for out_file in output_files)
+            
+            task = celery.AsyncResult(filename)
+            
+            if task.state == 'SUCCESS' or has_output:
+                file_status[filename] = 'Completed'
+            elif task.state == 'STARTED':
+                file_status[filename] = 'Processing'
+            elif task.state == 'PENDING':
+                file_status[filename] = 'Pending'
+            elif task.state == 'FAILURE':
+                file_status[filename] = 'Failed'
+            else:
+                file_status[filename] = f'Unknown ({task.state})'
+        
+        # Get currently running tasks
+        running_tasks = []
+        celery_inspect_error = None
+        try:
+            i = Inspect(app=celery)
+            active_tasks = i.active()
+            
+            if active_tasks:
+                for worker, tasks in active_tasks.items():
+                    for task in tasks:
+                        if task.get('name') == 'worker.process_volume':
+                            running_tasks.append(task.get('args', [''])[0])
+        except Exception as e:
+            celery_inspect_error = str(e)
+            app.logger.error(f"Error inspecting Celery tasks: {str(e)}")
+        
+        return render_template('upload.html', 
+                           input_files=input_files, 
+                           output_files=output_files, 
+                           file_status=file_status,
+                           running_tasks=running_tasks,
+                           celery_inspect_error=celery_inspect_error)
+    except ClientError as e:
+        return jsonify({'error': f'S3 list error: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'error': f'Unexpected error while listing files: {str(e)}\n{traceback.format_exc()}'}), 500
 
 @app.route('/get_upload_url', methods=['POST'])
 @auth.login_required
@@ -177,73 +232,6 @@ def complete_multipart_upload():
         return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
-
-@app.route('/files')
-@auth.login_required
-@limiter.limit("10 per minute")
-def list_files():
-    if not s3_resource:
-        return jsonify({'error': 'S3 resource not initialized. Check AWS credentials.'}), 500
-    
-    try:
-        input_bucket = s3_resource.Bucket(app.config['S3_BUCKET_INPUT'])
-        output_bucket = s3_resource.Bucket(app.config['S3_BUCKET_OUTPUT'])
-        
-        input_files = [obj.key for obj in input_bucket.objects.all()]
-        output_files = [obj.key for obj in output_bucket.objects.all()]
-        
-        # Get processing status for input files
-        file_status = {}
-        for filename in input_files:
-            # Check if there's a corresponding output file
-            filename_base = os.path.splitext(filename)[0]
-            has_output = any(out_file.startswith(filename_base) for out_file in output_files)
-            
-            task = celery.AsyncResult(filename)  # Now using filename as task ID
-            
-            # Mark as completed if task succeeded or output exists
-            if task.state == 'SUCCESS' or has_output:
-                file_status[filename] = 'Completed'
-            elif task.state == 'STARTED':
-                file_status[filename] = 'Processing'
-            elif task.state == 'PENDING':
-                file_status[filename] = 'Pending'
-            elif task.state == 'FAILURE':
-                file_status[filename] = 'Failed'
-            else:
-                file_status[filename] = f'Unknown ({task.state})'
-        
-        # Get currently running tasks
-        running_tasks = []
-        celery_inspect_error = None
-        try:
-            # Create an Inspect instance
-            i = Inspect(app=celery)
-            
-            # Get active tasks
-            active_tasks = i.active()
-            
-            if active_tasks:
-                for worker, tasks in active_tasks.items():
-                    for task in tasks:
-                        if task.get('name') == 'worker.process_volume':
-                            # Assuming the filename is the first argument
-                            running_tasks.append(task.get('args', [''])[0])
-        except Exception as e:
-            celery_inspect_error = str(e)
-            app.logger.error(f"Error inspecting Celery tasks: {str(e)}")
-        
-        return render_template('files.html', 
-                               input_files=input_files, 
-                               output_files=output_files, 
-                               file_status=file_status,
-                               running_tasks=running_tasks,
-                               celery_inspect_error=celery_inspect_error)
-    except ClientError as e:
-        return jsonify({'error': f'S3 list error: {str(e)}'}), 500
-    except Exception as e:
-        return jsonify({'error': f'Unexpected error while listing files: {str(e)}\n{traceback.format_exc()}'}), 500
-
 
 @app.route('/download/<bucket>/<filename>')
 @auth.login_required
