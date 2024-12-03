@@ -114,17 +114,21 @@
                 var $items = $list.find("li:not(.no-files)");
                 var visibleCount = 0;
 
+                searchValue = searchValue.toLowerCase();
+
                 $items.each(function() {
-                    var text = $(this).clone()
-                        .children()
-                        .remove()
-                        .end()
-                        .text()
-                        .trim().toLowerCase();
-                    
-                    var shouldShow = text.includes(searchValue.toLowerCase());
-                    $(this).toggle(shouldShow);
-                    if (shouldShow) visibleCount++;
+                    // Get only the filename text, not the buttons/badges
+                    var $item = $(this);
+                    var filename = $item.contents().filter(function() {
+                        return this.nodeType === 3; // Text nodes only
+                    }).text().trim().toLowerCase();
+
+                    if (filename.includes(searchValue)) {
+                        $item.show();
+                        visibleCount++;
+                    } else {
+                        $item.hide();
+                    }
                 });
 
                 // Show/hide the "No matching files found" message
