@@ -103,51 +103,46 @@
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script>
         $(document).ready(function() {
-            // Fix error message handling
-            var errorMessage = {% if error %}"{{ error|e }}"{% else %}null{% endif %};
-            if (errorMessage) {
+            // Safely handle error message from server
+            var errorMessage = "{{ error|default('null')|e('js') }}";
+            if (errorMessage && errorMessage !== "null") {
                 $('#error').text(errorMessage).show();
             }
 
-            function updateList(searchValue, listId) {
-                var $list = $("#" + listId);
-                var $items = $list.find("li:not(.no-files)");
-                var visibleCount = 0;
+            // Search functionality for input files
+            $("#inputSearch").on("input", function() {
+                var searchText = $(this).val().toLowerCase();
+                console.log("Searching for:", searchText);
 
-                searchValue = searchValue.toLowerCase();
-
-                $items.each(function() {
-                    // Get only the filename text, not the buttons/badges
-                    var $item = $(this);
-                    var filename = $item.contents().filter(function() {
-                        return this.nodeType === 3; // Text nodes only
-                    }).text().trim().toLowerCase();
-
-                    if (filename.includes(searchValue)) {
-                        $item.show();
-                        visibleCount++;
-                    } else {
-                        $item.hide();
+                $("#inputFilesList li").each(function() {
+                    var $li = $(this);
+                    if (!$li.hasClass('no-files')) {
+                        var fileText = $li.first().contents().first().text().trim().toLowerCase();
+                        console.log("File text:", fileText);
+                        if (fileText.includes(searchText)) {
+                            $li.show();
+                        } else {
+                            $li.hide();
+                        }
                     }
                 });
-
-                // Show/hide the "No matching files found" message
-                $list.find(".no-files").toggle(visibleCount === 0);
-            }
-
-            // Search functionality for input files
-            $("#inputSearch").on("keyup", function() {
-                updateList($(this).val(), "inputFilesList");
             });
 
             // Search functionality for output files
-            $("#outputSearch").on("keyup", function() {
-                updateList($(this).val(), "outputFilesList");
+            $("#outputSearch").on("input", function() {
+                var searchText = $(this).val().toLowerCase();
+                $("#outputFilesList li").each(function() {
+                    var $li = $(this);
+                    if (!$li.hasClass('no-files')) {
+                        var fileText = $li.first().contents().first().text().trim().toLowerCase();
+                        if (fileText.includes(searchText)) {
+                            $li.show();
+                        } else {
+                            $li.hide();
+                        }
+                    }
+                });
             });
-
-            // Initial check for empty lists
-            updateList("", "inputFilesList");
-            updateList("", "outputFilesList");
         });
     </script>
 </body>
