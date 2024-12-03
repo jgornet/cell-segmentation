@@ -192,13 +192,19 @@ def list_files():
         # Get processing status for input files
         file_status = {}
         for filename in input_files:
+            # Check if there's a corresponding output file
+            filename_base = os.path.splitext(filename)[0]
+            has_output = any(out_file.startswith(filename_base) for out_file in output_files)
+            
             task = celery.AsyncResult(filename)  # Now using filename as task ID
-            if task.state == 'PENDING':
-                file_status[filename] = 'Pending'
+            
+            # Mark as completed if task succeeded or output exists
+            if task.state == 'SUCCESS' or has_output:
+                file_status[filename] = 'Completed'
             elif task.state == 'STARTED':
                 file_status[filename] = 'Processing'
-            elif task.state == 'SUCCESS':
-                file_status[filename] = 'Completed'
+            elif task.state == 'PENDING':
+                file_status[filename] = 'Pending'
             elif task.state == 'FAILURE':
                 file_status[filename] = 'Failed'
             else:
