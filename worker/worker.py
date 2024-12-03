@@ -37,7 +37,7 @@ def process_volume(self, url):
     print("Uploading traces")
     fn = os.path.splitext(url)[0]
     upload_url = f"{fn}.zip"
-    upload_traces(upload_url)
+    upload_output(upload_url)
     print("Uploaded traces")
 
     clean_directory()
@@ -119,7 +119,7 @@ def generate_traces():
     voluseg.step5_clean_cells(parameters)
 
 
-def upload_traces(url: str):
+def upload_output(url: str):
     # Replace .hdf5 extension with .zip
     # url = url.replace('.hdf5', '.zip')
     
