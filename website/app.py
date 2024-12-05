@@ -285,5 +285,136 @@ def get_task_error(task_id):
     except Exception as e:
         return jsonify({'error': f'Error retrieving task error: {str(e)}'}), 500
 
+# Add new API endpoints
+@app.route('/api/upload', methods=['POST'])
+@auth.login_required
+@limiter.limit("10 per minute")
+def api_upload():
+    if not s3_client:
+        return jsonify({'error': 'S3 client not initialized'}), 500
+        
+    if 'file_name' not in request.json or 'file_size' not in request.json:
+        return jsonify({'error': 'file_name and file_size required'}), 400
+        
+    file_name = request.json['file_name']
+    file_size = int(request.json['file_size'])
+    parameters = request.json.get('parameters')  # Optional parameters
+    
+    try:
+        # Generate unique filename
+        unique_filename = f"{uuid.uuid4()}-{secure_filename(file_name)}"
+        
+        # Initiate multipart upload
+        multipart_upload = s3_client.create_multipart_upload(
+            Bucket=app.config['S3_BUCKET_INPUT'],
+            Key=unique_filename,
+            ContentType="image/tiff"
+        )
+        
+        # Calculate parts
+        part_size = 5 * 1024 * 1024  # 5MB
+        total_parts = math.ceil(file_size / part_size)
+        
+        # Generate presigned URLs
+        presigned_urls = []
+        for part_number in range(1, total_parts + 1):
+            url = s3_client.generate_presigned_url(
+                'upload_part',
+                Params={
+                    'Bucket': app.config['S3_BUCKET_INPUT'],
+                    'Key': unique_filename,
+                    'UploadId': multipart_upload['UploadId'],
+                    'PartNumber': part_number
+                },
+                ExpiresIn=3600
+            )
+            presigned_urls.append(url)
+            
+        return jsonify({
+            'upload_id': multipart_upload['UploadId'],
+            'file_name': unique_filename,
+            'urls': presigned_urls,
+            'part_size': part_size
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/complete_upload', methods=['POST'])
+@auth.login_required
+@limiter.limit("10 per minute")
+def api_complete_upload():
+    if not request.json:
+        return jsonify({'error': 'Invalid request'}), 400
+        
+    try:
+        # Complete multipart upload
+        response = s3_client.complete_multipart_upload(
+            Bucket=app.config['S3_BUCKET_INPUT'],
+            Key=request.json['file_name'],
+            UploadId=request.json['upload_id'],
+            MultipartUpload={'Parts': request.json['parts']}
+        )
+        
+        # Start processing
+        parameters = request.json.get('parameters')
+        task = celery.send_task(
+            'worker.process_volume',
+            args=[request.json['file_name'], parameters],
+            task_id=request.json['file_name'],
+            queue='tasks'
+        )
+        
+        return jsonify({
+            'task_id': task.id,
+            'status': 'processing'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/status/<task_id>')
+@auth.login_required
+@limiter.limit("10 per minute")
+def api_task_status(task_id):
+    try:
+        task = celery.AsyncResult(task_id)
+        
+        if task.state == 'FAILURE':
+            return jsonify({
+                'status': 'failed',
+                'error': str(task.result),
+                'traceback': task.traceback
+            })
+            
+        # Check for output file
+        output_key = f"{os.path.splitext(task_id)[0]}.zip"
+        try:
+            s3_client.head_object(
+                Bucket=app.config['S3_BUCKET_OUTPUT'],
+                Key=output_key
+            )
+            # Generate download URL if output exists
+            url = s3_client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': app.config['S3_BUCKET_OUTPUT'],
+                    'Key': output_key
+                },
+                ExpiresIn=3600
+            )
+            return jsonify({
+                'status': 'completed',
+                'download_url': url
+            })
+        except ClientError:
+            # Output file doesn't exist yet
+            return jsonify({
+                'status': task.state.lower()
+            })
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
