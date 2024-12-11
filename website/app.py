@@ -197,7 +197,11 @@ def get_upload_url():
                     'UploadId': multipart_upload['UploadId'],
                     'PartNumber': part_number,
                 },
+<<<<<<< HEAD
                 ExpiresIn= 48 * 3600  # Increased to 48 hours
+=======
+                ExpiresIn=3600
+>>>>>>> parent of 1aaecc2 (Changed expire time for uploading url links from 1hr to 24hrs)
             ) 
             presigned_urls.append(presigned_url)
 
