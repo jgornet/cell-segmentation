@@ -192,7 +192,7 @@ def get_upload_url():
                     'UploadId': multipart_upload['UploadId'],
                     'PartNumber': part_number,
                 },
-                ExpiresIn=3600
+                ExpiresIn=24 * 3600  # 24 hours instead of 1 hour
             ) 
         
             presigned_urls.append(presigned_url)
@@ -326,7 +326,7 @@ def api_upload():
                     'UploadId': multipart_upload['UploadId'],
                     'PartNumber': part_number
                 },
-                ExpiresIn=3600
+                ExpiresIn=24 * 3600  # 24 hours instead of 1 hour
             )
             presigned_urls.append(url)
             
