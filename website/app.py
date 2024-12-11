@@ -177,9 +177,14 @@ def get_upload_url():
             ContentType="image/tiff"
         )
         
-        # Calculate the number of parts (assuming 5MB part size)
-        part_size = 5 * 1024 * 1024  # 5MB
+        # Calculate the number of parts (increasing part size for large files)
+        part_size = 20 * 1024 * 1024  # Increased to 20MB
         total_parts = math.ceil(file_size / part_size)
+        
+        # If file is very large, increase part size to keep parts under 1000 (S3 limit)
+        while total_parts > 1000:
+            part_size *= 2
+            total_parts = math.ceil(file_size / part_size)
 
         # Generate presigned URLs for each part
         presigned_urls = []
@@ -192,16 +197,16 @@ def get_upload_url():
                     'UploadId': multipart_upload['UploadId'],
                     'PartNumber': part_number,
                 },
-                ExpiresIn=24 * 3600  # 24 hours instead of 1 hour
+                ExpiresIn= 48 * 3600  # Increased to 48 hours
             ) 
-        
             presigned_urls.append(presigned_url)
 
         return jsonify({
             'uploadId': multipart_upload['UploadId'],
             'urls': presigned_urls,
             'fileName': unique_filename,
-            'partSize': part_size
+            'partSize': part_size,
+            'totalParts': total_parts
         })
     except ClientError as e:
         return jsonify({'error': f'Error initiating multipart upload: {str(e)}'}), 500
@@ -326,7 +331,7 @@ def api_upload():
                     'UploadId': multipart_upload['UploadId'],
                     'PartNumber': part_number
                 },
-                ExpiresIn=24 * 3600  # 24 hours instead of 1 hour
+                ExpiresIn= 48 * 3600  # 24 hours instead of 1 hour
             )
             presigned_urls.append(url)
             
