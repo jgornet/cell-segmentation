@@ -103,7 +103,11 @@ def upload_form():
         input_bucket = s3_resource.Bucket(app.config['S3_BUCKET_INPUT'])
         output_bucket = s3_resource.Bucket(app.config['S3_BUCKET_OUTPUT'])
         
-        input_files = [obj.key for obj in input_bucket.objects.all()]
+        # Filter out parameter files and only include tif/tiff files
+        input_files = [
+            obj.key for obj in input_bucket.objects.all()
+            if obj.key.lower().endswith(('.tif', '.tiff')) and not obj.key.endswith('.params.json')
+        ]
         output_files = [obj.key for obj in output_bucket.objects.all()]
         
         # Get processing status for input files
@@ -226,15 +230,33 @@ def complete_multipart_upload():
             UploadId=data['uploadId'],
             MultipartUpload={'Parts': data['parts']}
         )
-        # Enqueue processing task with optional parameters
-        parameters = data.get('parameters')  # Will be None if not provided
+        
+        # Save parameters to S3 if they exist
+        parameters = data.get('parameters')
+        if parameters:
+            params_key = f"{data['fileName']}.params.json"
+            try:
+                s3_client.put_object(
+                    Bucket=app.config['S3_BUCKET_INPUT'],
+                    Key=params_key,
+                    Body=parameters
+                )
+            except Exception as e:
+                app.logger.error(f"Error saving parameters: {str(e)}")
+        
+        # Start processing task
         task = celery.send_task(
             'worker.process_volume',
             args=[data['fileName'], parameters],
             task_id=data['fileName'],
             queue='tasks'
         )
-        return jsonify({'success': True, 'message': 'File upload completed and queued for processing', 'task_id': task.id})
+        
+        return jsonify({
+            'success': True,
+            'message': 'File upload completed and queued for processing',
+            'task_id': task.id
+        })
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
 
@@ -418,6 +440,47 @@ def api_task_status(task_id):
                 'status': task.state.lower()
             })
             
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/restart_task/<filename>', methods=['POST'])
+@auth.login_required
+@limiter.limit("10 per minute")
+def restart_task(filename):
+    try:
+        # Revoke the existing task if it exists
+        task = celery.AsyncResult(filename)
+        if task:
+            task.revoke(terminate=True)
+
+        # Try to get saved parameters
+        parameters = None
+        params_key = f"{filename}.params.json"
+        try:
+            response = s3_client.get_object(
+                Bucket=app.config['S3_BUCKET_INPUT'],
+                Key=params_key
+            )
+            parameters = response['Body'].read().decode('utf-8')
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'NoSuchKey':
+                app.logger.error(f"Error retrieving parameters: {str(e)}")
+        except Exception as e:
+            app.logger.error(f"Error retrieving parameters: {str(e)}")
+
+        # Start a new task with the original parameters if they exist
+        new_task = celery.send_task(
+            'worker.process_volume',
+            args=[filename, parameters],
+            task_id=filename,
+            queue='tasks'
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Task restarted successfully',
+            'task_id': new_task.id
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

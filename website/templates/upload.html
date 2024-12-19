@@ -141,6 +141,10 @@
                                         </span>
                                         {% if file_status[file] == 'Failed' %}
                                             <button class="btn btn-sm btn-danger ml-2 error-details-btn" data-task-id="{{ file }}">Error Details</button>
+                                            <button class="btn btn-sm btn-warning ml-2 restart-task-btn" data-filename="{{ file }}">Restart</button>
+                                        {% endif %}
+                                        {% if file_status[file] == 'Pending' %}
+                                            <button class="btn btn-sm btn-warning ml-2 restart-task-btn" data-filename="{{ file }}">Restart</button>
                                         {% endif %}
                                         <a href="{{ url_for('download_file', bucket=config['S3_BUCKET_INPUT'], filename=file) }}" class="btn btn-sm btn-primary ml-2">Download</a>
                                     </span>
@@ -324,7 +328,10 @@
             
             return files.map(function(file) {
                 const errorButton = file.status === 'Failed' ? 
-                    `<button class="btn btn-sm btn-danger ml-2 error-details-btn" data-task-id="${file.filename}">Error Details</button>` : '';
+                    `<button class="btn btn-sm btn-danger ml-2 error-details-btn" data-task-id="${file.filename}">Error Details</button>
+                    <button class="btn btn-sm btn-warning ml-2 restart-task-btn" data-filename="${file.filename}">Restart</button>` : 
+                    (file.status === 'Pending' ? 
+                    `<button class="btn btn-sm btn-warning ml-2 restart-task-btn" data-filename="${file.filename}">Restart</button>` : '');
                 
                 return `
                     <li class="list-group-item d-flex justify-content-between align-items-center" data-filename="${file.filename}">
@@ -370,6 +377,38 @@
                 return filename.toLowerCase().includes(searchText);
             });
             $("#outputFilesList").html(generateOutputListHTML(filteredFiles));
+        });
+
+        // Add handler for restart task button
+        $(document).on('click', '.restart-task-btn', function() {
+            const filename = $(this).data('filename');
+            const button = $(this);
+            
+            // Disable the button and show loading state
+            button.prop('disabled', true).text('Restarting...');
+            
+            // Send restart request
+            $.ajax({
+                url: `/restart_task/${encodeURIComponent(filename)}`,
+                method: 'POST',
+                success: function(response) {
+                    // Show success message
+                    $('#status').html('Task restarted successfully. Task ID: ' + response.task_id);
+                    // Reload the page after 2 seconds
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
+                },
+                error: function(xhr) {
+                    // Re-enable the button
+                    button.prop('disabled', false).text('Restart');
+                    let errorMessage = 'Failed to restart task.';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMessage += '\n' + xhr.responseJSON.error;
+                    }
+                    $('#error').text(errorMessage).show();
+                }
+            });
         });
 
         // Theme handling
