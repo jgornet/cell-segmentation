@@ -6,7 +6,6 @@ from celery import Celery
 RABBITMQ_URL = os.environ["RABBITMQ_URL"]
 REDIS_URL = os.environ["REDIS_URL"]
 
-
 celery = Celery(
     "tasks",
     broker=RABBITMQ_URL,
