@@ -5,6 +5,7 @@ metadata:
   labels:
     app: voluseg-worker
 spec:
+  progressDeadlineSeconds: 1800
   replicas: 1
   selector:
     matchLabels:
@@ -47,7 +48,7 @@ spec:
           mountPath: /data
         resources:
           requests:
-            memory: 80Gi
+            memory: 128Gi
       volumes:
       - name: redis-tls
         secret:
