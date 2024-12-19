@@ -47,7 +47,7 @@ spec:
           mountPath: /data
         resources:
           requests:
-            memory: 60Gi
+            memory: 128Gi
       volumes:
       - name: redis-tls
         secret:
