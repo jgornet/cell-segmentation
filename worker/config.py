@@ -22,3 +22,4 @@ celery = Celery(
 )
 
 celery.conf.broker_transport_options = {"visibility_timeout": 24 * 60 * 60}
+
