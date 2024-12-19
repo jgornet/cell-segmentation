@@ -16,6 +16,7 @@ from pyspark.sql import SparkSession
 from config import celery
 
 
+
 @celery.task(bind=True, queue='tasks')
 def process_volume(self, url, parameters_json=None):
     self.update_state(task_id=url, state='STARTED')
