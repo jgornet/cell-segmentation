@@ -48,11 +48,11 @@ def process_volume(self, url, parameters_json=None):
 def get_spark(**kwargs):
     spark = (
         SparkSession.builder.master("local[*]")
-        .config("spark.driver.maxResultSize", "0")
-        .config("spark.executor.memory", "80g")
-        .config("spark.driver.memory", "80g")
+        .config("spark.driver.maxResultSize", "64g")
+        .config("spark.executor.memory", "100g")
+        .config("spark.driver.memory", "100g")
         .config("spark.memory.offHeap.enabled", True)
-        .config("spark.memory.offHeap.size", "80g")
+        .config("spark.memory.offHeap.size", "100g")
         .appName("sampleCodeForReference")
         .getOrCreate()
     )
