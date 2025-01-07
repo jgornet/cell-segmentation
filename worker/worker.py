@@ -3,9 +3,12 @@ import os
 from functools import lru_cache
 import shutil
 import logging
+import psutil
+import gc
+import sys
+import traceback
 
 from celery import signals
-
 import boto3
 from skimage import io
 import numpy as np
@@ -15,66 +18,107 @@ from pyspark.sql import SparkSession
 
 from config import celery
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def log_memory_usage():
+    process = psutil.Process(os.getpid())
+    mem_info = process.memory_info()
+    logger.info(f"Memory Usage - RSS: {mem_info.rss / 1024 / 1024:.2f}MB, VMS: {mem_info.vms / 1024 / 1024:.2f}MB")
+
+def log_spark_status(spark):
+    try:
+        logger.info(f"Active Spark Sessions: {SparkSession.getActiveSession()}")
+        logger.info(f"Spark UI URL: {spark.sparkContext.uiWebUrl}")
+        logger.info(f"Available Executors: {len(spark.sparkContext.statusTracker().getExecutorInfos())}")
+        logger.info(f"Default Parallelism: {spark.sparkContext.defaultParallelism}")
+    except Exception as e:
+        logger.error(f"Error getting Spark status: {str(e)}")
 
 @celery.task(bind=True, queue='tasks')
 def process_volume(self, url, parameters_json=None):
-    self.update_state(task_id=url, state='STARTED')
-    
-    download_url = url
+    try:
+        logger.info(f"Starting process_volume task for {url}")
+        log_memory_usage()
+        
+        self.update_state(task_id=url, state='STARTED')
+        download_url = url
 
-    print(f"Downloading {download_url}")
-    download_tif(download_url)
-    print(f"Downloaded {download_url}")
+        logger.info(f"Downloading {download_url}")
+        download_tif(download_url)
+        logger.info(f"Downloaded {download_url}")
+        log_memory_usage()
 
-    print("Converting tif to h5")
-    tif_to_h5("/data/input.tif")
-    print("Converted tif to h5")
+        logger.info("Converting tif to h5")
+        tif_to_h5("/data/input.tif")
+        logger.info("Converted tif to h5")
+        log_memory_usage()
 
-    print("Generating traces")
-    generate_output(parameters_json)
-    print("Generated traces")
+        logger.info("Starting generate_output")
+        generate_output(parameters_json)
+        logger.info("Completed generate_output")
+        log_memory_usage()
 
-    print("Uploading traces")
-    fn = os.path.splitext(url)[0]
-    upload_url = f"{fn}.zip"
-    upload_output(upload_url)
-    print("Uploaded output")
+        logger.info("Uploading traces")
+        fn = os.path.splitext(url)[0]
+        upload_url = f"{fn}.zip"
+        upload_output(upload_url)
+        logger.info("Uploaded output")
 
-    clean_directory()
-
+        clean_directory()
+        logger.info("Task completed successfully")
+        
+    except Exception as e:
+        logger.error(f"Task failed with error: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        # Force garbage collection
+        gc.collect()
+        raise
 
 @signals.worker_process_init.connect
 @lru_cache(maxsize=None)
 def get_spark(**kwargs):
-    spark = (
-        SparkSession.builder.master("local[*]")
-        .config("spark.driver.maxResultSize", "10g")
-        .config("spark.executor.memory", "50g")
-        .config("spark.driver.memory", "50g")
-        .config("spark.memory.offHeap.enabled", True)
-        .config("spark.memory.offHeap.size", "20g")
-        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
-        .config("spark.kryoserializer.buffer.max", "512m")
-        .config("spark.kryoserializer.buffer", "128m")
-        .config("spark.memory.fraction", "0.6")
-        .config("spark.memory.storageFraction", "0.4")
-        .config("spark.shuffle.file.buffer", "1m")
-        .config("spark.shuffle.spill.compress", "true")
-        .config("spark.shuffle.compress", "true")
-        .config("spark.rdd.compress", "true")
-        .config("spark.default.parallelism", "4")
-        .config("spark.sql.shuffle.partitions", "4")
-        .config("spark.python.worker.memory", "4g")
-        .config("spark.python.worker.reuse", "true")
-        .config("spark.executor.extraJavaOptions", "-XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps")
-        .config("spark.driver.extraJavaOptions", "-XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps")
-        .appName("voluseg_processing")
-        .getOrCreate()
-    )
-    
-    spark.sparkContext.setLogLevel("WARN")
-    return spark
-
+    logger.info("Initializing Spark session")
+    try:
+        spark = (
+            SparkSession.builder.master("local[*]")
+            .config("spark.driver.maxResultSize", "10g")
+            .config("spark.executor.memory", "50g")
+            .config("spark.driver.memory", "50g")
+            .config("spark.memory.offHeap.enabled", True)
+            .config("spark.memory.offHeap.size", "20g")
+            .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+            .config("spark.kryoserializer.buffer.max", "512m")
+            .config("spark.kryoserializer.buffer", "128m")
+            .config("spark.memory.fraction", "0.6")
+            .config("spark.memory.storageFraction", "0.4")
+            .config("spark.shuffle.file.buffer", "1m")
+            .config("spark.shuffle.spill.compress", "true")
+            .config("spark.shuffle.compress", "true")
+            .config("spark.rdd.compress", "true")
+            .config("spark.default.parallelism", "4")
+            .config("spark.sql.shuffle.partitions", "4")
+            .config("spark.python.worker.memory", "4g")
+            .config("spark.python.worker.reuse", "true")
+            .config("spark.executor.extraJavaOptions", "-XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -verbose:gc")
+            .config("spark.driver.extraJavaOptions", "-XX:+UseG1GC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -verbose:gc")
+            .appName("voluseg_processing")
+            .getOrCreate()
+        )
+        
+        spark.sparkContext.setLogLevel("WARN")
+        
+        logger.info("Spark session initialized successfully")
+        log_spark_status(spark)
+        log_memory_usage()
+        
+        return spark
+        
+    except Exception as e:
+        logger.error(f"Failed to initialize Spark: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        raise
 
 def download_tif(url: str):
     s3 = boto3.resource(
@@ -108,47 +152,78 @@ def tif_to_h5(tif_path):
 
 
 def generate_output(custom_parameters=None):
-    
+    logger.info("Starting generate_output")
+    log_memory_usage()
 
-    # If custom parameters were provided, overwrite the generated parameters file
+    try:
+        parameters = voluseg.parameter_dictionary()
+        logger.info("Got parameter dictionary")
 
-    parameters = voluseg.parameter_dictionary()
+        if custom_parameters:
+            logger.info("Applying custom parameters")
+            c_parameters = loads(custom_parameters)
+            for key, value in c_parameters.items():
+                parameters[key] = value
+                logger.info(f"Set parameter {key} = {value}")
 
-    if custom_parameters:
-        c_parameters = loads(custom_parameters)
-        for key, value in c_parameters.items():
-            parameters[key] = value
+        else:
+            logger.info("Using default parameters")
+            parameters["registration"] = "high"
+            parameters["diam_cell"] = 5.0
+            parameters["f_volume"] = 1.0
+            parameters["t_section"] = 0.04
+            parameters["ds"] = 1
+            parameters["res_x"] = 0.585
+            parameters["res_y"] = 0.585
+            parameters["res_z"] = 25
 
-    else:
-        parameters["registration"] = "high"
-        parameters["diam_cell"] = 5.0
-        parameters["f_volume"] = 1.0
-        parameters["t_section"] = 0.04
-        parameters["ds"] = 1
-        parameters["res_x"] = 0.585
-        parameters["res_y"] = 0.585
-        parameters["res_z"] = 25
+        parameters["dir_ants"] = "/opt/ANTs/bin"
+        parameters["dir_input"] = "/data/h5_volume"
+        parameters["dir_output"] = "/data/output"
 
-    parameters["dir_ants"] = "/opt/ANTs/bin"
-    parameters["dir_input"] = "/data/h5_volume"
-    parameters["dir_output"] = "/data/output"
+        logger.info("Processing parameters with step0")
+        voluseg.step0_process_parameters(parameters)
+        logger.info("Completed step0")
+        log_memory_usage()
 
-    voluseg.step0_process_parameters(parameters)
+        with open("/data/output/parameters.json", "r") as f:
+            parameters = loads(f.read())
+        logger.info("Loaded processed parameters")
 
-    # Now read the parameters file (either custom or generated)
-    with open("/data/output/parameters.json", "r") as f:
-        parameters = loads(f.read())
+        logger.info("Starting step1_process_volumes")
+        log_memory_usage()
+        voluseg.step1_process_volumes(parameters)
+        logger.info("Completed step1")
+        log_memory_usage()
 
-    # sets directory parameters in json
-    
+        logger.info("Starting step2_align_volumes")
+        voluseg.step2_align_volumes(parameters)
+        logger.info("Completed step2")
+        log_memory_usage()
 
-    # Continue with processing
-    voluseg.step1_process_volumes(parameters)
-    voluseg.step2_align_volumes(parameters)
-    parameters["volume_names"] = np.array(parameters["volume_names"])
-    voluseg.step3_mask_volumes(parameters)
-    voluseg.step4_detect_cells(parameters)
-    voluseg.step5_clean_cells(parameters)
+        parameters["volume_names"] = np.array(parameters["volume_names"])
+        
+        logger.info("Starting step3_mask_volumes")
+        voluseg.step3_mask_volumes(parameters)
+        logger.info("Completed step3")
+        log_memory_usage()
+
+        logger.info("Starting step4_detect_cells")
+        voluseg.step4_detect_cells(parameters)
+        logger.info("Completed step4")
+        log_memory_usage()
+
+        logger.info("Starting step5_clean_cells")
+        voluseg.step5_clean_cells(parameters)
+        logger.info("Completed step5")
+        log_memory_usage()
+
+    except Exception as e:
+        logger.error(f"Error in generate_output: {str(e)}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        # Force garbage collection before raising
+        gc.collect()
+        raise
 
 
 def upload_output(url: str):
