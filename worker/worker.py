@@ -18,6 +18,7 @@ from pyspark.sql import SparkSession
 
 from config import celery
 
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
