@@ -108,18 +108,18 @@ def tif_to_h5(tif_path):
 
 
 def generate_output(custom_parameters=None):
-    
-
-    # If custom parameters were provided, overwrite the generated parameters file
+    print("Starting generate_output")
 
     parameters = voluseg.parameter_dictionary()
 
     if custom_parameters:
+        print("Applying custom parameters")
         c_parameters = loads(custom_parameters)
         for key, value in c_parameters.items():
             parameters[key] = value
 
     else:
+        print("Using default parameters")
         parameters["registration"] = "high"
         parameters["diam_cell"] = 5.0
         parameters["f_volume"] = 1.0
@@ -133,22 +133,82 @@ def generate_output(custom_parameters=None):
     parameters["dir_input"] = "/data/h5_volume"
     parameters["dir_output"] = "/data/output"
 
+    print("Processing parameters with step0")
     voluseg.step0_process_parameters(parameters)
 
-    # Now read the parameters file (either custom or generated)
     with open("/data/output/parameters.json", "r") as f:
         parameters = loads(f.read())
 
-    # sets directory parameters in json
+    # Process volumes sequentially for step1
+    print("Starting step1_process_volumes sequentially")
+    input_dir = parameters["dir_input"]
+    volume_files = sorted([f for f in os.listdir(input_dir) if f.endswith('.h5')])
     
+    for volume_file in volume_files:
+        print(f"Processing volume {volume_file} in step1")
+        volume_path = os.path.join(input_dir, volume_file)
+        # Create a temporary parameters dict for this volume
+        vol_params = parameters.copy()
+        vol_params["volume_files"] = [volume_file]
+        
+        try:
+            voluseg.step1_process_volumes(vol_params)
+            print(f"Completed processing {volume_file} in step1")
+        except Exception as e:
+            print(f"Error processing {volume_file} in step1: {str(e)}")
+            raise
+        
+        # Force cleanup after each volume
+        import gc
+        gc.collect()
+        
+        # Get Spark context and clear cache
+        spark = get_spark()
+        spark.catalog.clearCache()
+        
+        print(f"Cleaned up after processing {volume_file}")
 
-    # Continue with processing
-    voluseg.step1_process_volumes(parameters)
-    voluseg.step2_align_volumes(parameters)
+    print("Completed step1")
+
+    # Process volumes sequentially for step2
+    print("Starting step2_align_volumes sequentially")
+    processed_volumes = sorted([f for f in os.listdir(parameters["dir_output"]) if f.startswith('volume')])
+    
+    for volume in processed_volumes:
+        print(f"Aligning volume {volume} in step2")
+        # Create a temporary parameters dict for this volume
+        vol_params = parameters.copy()
+        vol_params["volume_names"] = [volume]
+        
+        try:
+            voluseg.step2_align_volumes(vol_params)
+            print(f"Completed aligning {volume} in step2")
+        except Exception as e:
+            print(f"Error aligning {volume} in step2: {str(e)}")
+            raise
+        
+        # Force cleanup after each volume
+        gc.collect()
+        spark = get_spark()
+        spark.catalog.clearCache()
+        
+        print(f"Cleaned up after aligning {volume}")
+
+    print("Completed step2")
+
+    # Continue with the remaining steps as they don't use Spark
     parameters["volume_names"] = np.array(parameters["volume_names"])
+    print("Starting step3_mask_volumes")
     voluseg.step3_mask_volumes(parameters)
+    print("Completed step3")
+
+    print("Starting step4_detect_cells")
     voluseg.step4_detect_cells(parameters)
+    print("Completed step4")
+
+    print("Starting step5_clean_cells")
     voluseg.step5_clean_cells(parameters)
+    print("Completed step5")
 
 
 def upload_output(url: str):
