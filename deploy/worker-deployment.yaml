@@ -48,19 +48,18 @@ spec:
           mountPath: /data
         resources:
           requests:
-            memory: 96Gi
+            memory: 120Gi
+            cpu: "24"
+          limits:
+            memory: 160Gi
+            cpu: "40"
       volumes:
       - name: redis-tls
         secret:
           secretName: celery-redis-tls-secret
       - name: temporary-volume
-        ephemeral:
-          volumeClaimTemplate:
-            spec:
-              accessModes: [ "ReadWriteOnce" ]
-              resources:
-                requests:
-                  storage: 200Gi
+        emptyDir:
+          sizeLimit: 400Gi
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -73,7 +72,7 @@ spec:
     kind: Deployment
   pollingInterval: 30
   cooldownPeriod: 600
-  maxReplicaCount: 20
+  maxReplicaCount: 1
   minReplicaCount: 0
   triggers:
     - type: rabbitmq
