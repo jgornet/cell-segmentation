@@ -381,19 +381,29 @@
 
         // Add handler for restart task button
         $(document).on('click', '.restart-task-btn', function() {
-            const filename = $(this).data('filename');
-            const button = $(this);
+            var filename = $(this).data('filename');
+            var button = $(this);
             
             // Disable the button and show loading state
             button.prop('disabled', true).text('Restarting...');
             
             // Send restart request
             $.ajax({
-                url: `/restart_task/${encodeURIComponent(filename)}`,
+                url: '/restart_task/' + encodeURIComponent(filename),
                 method: 'POST',
                 success: function(response) {
                     // Show success message
-                    $('#status').html('Task restarted successfully. Task ID: ' + response.task_id);
+                    $('#status').html('Task restarted successfully. New Task ID: ' + response.task_id);
+                    
+                    // Update the status badge to Pending
+                    var statusBadge = button.siblings('.badge');
+                    statusBadge.removeClass('badge-danger badge-warning badge-success')
+                        .addClass('badge-secondary')
+                        .text('Pending');
+                    
+                    // Hide the restart button
+                    button.hide();
+                    
                     // Reload the page after 2 seconds
                     setTimeout(function() {
                         location.reload();
@@ -402,7 +412,7 @@
                 error: function(xhr) {
                     // Re-enable the button
                     button.prop('disabled', false).text('Restart');
-                    let errorMessage = 'Failed to restart task.';
+                    var errorMessage = 'Failed to restart task.';
                     if (xhr.responseJSON && xhr.responseJSON.error) {
                         errorMessage += '\n' + xhr.responseJSON.error;
                     }

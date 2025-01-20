@@ -448,10 +448,13 @@ def api_task_status(task_id):
 @limiter.limit("10 per minute")
 def restart_task(filename):
     try:
-        # Revoke the existing task if it exists
+        # Get the existing task
         task = celery.AsyncResult(filename)
+        
+        # Force cleanup of the old task state
         if task:
             task.revoke(terminate=True)
+            celery.backend.delete(filename)  # Remove task state from Redis
 
         # Try to get saved parameters
         parameters = None
@@ -468,18 +471,21 @@ def restart_task(filename):
         except Exception as e:
             app.logger.error(f"Error retrieving parameters: {str(e)}")
 
+        # Create a new task ID with timestamp to avoid state conflicts
+        new_task_id = f"{filename}_{int(time.time())}"
+        
         # Start a new task with the original parameters if they exist
         new_task = celery.send_task(
             'worker.process_volume',
             args=[filename, parameters],
-            task_id=filename,
+            task_id=new_task_id,
             queue='tasks'
         )
         
         return jsonify({
             'success': True,
             'message': 'Task restarted successfully',
-            'task_id': new_task.id
+            'task_id': new_task_id
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
