@@ -71,9 +71,9 @@ spec:
     name: voluseg-worker
     kind: Deployment
   pollingInterval: 30
-  cooldownPeriod: 600
+  cooldownPeriod: 1800
   maxReplicaCount: 1
-  minReplicaCount: 0
+  minReplicaCount: 1
   triggers:
     - type: rabbitmq
       metadata:
