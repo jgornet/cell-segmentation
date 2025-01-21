@@ -35,4 +35,5 @@ RUN pip install \
     git+https://github.com/mikarubi/voluseg.git \
     findspark \
     boto3 \
-    celery[redis]
+    celery[redis] \
+    psutil
