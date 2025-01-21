@@ -1,5 +1,7 @@
 FROM gornet/voluseg:1.0.0
 
+RUN pip install psutil
+
 COPY worker /worker
 
 WORKDIR /worker
