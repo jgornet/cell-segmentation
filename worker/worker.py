@@ -7,7 +7,6 @@ import psutil
 import gc
 import sys
 import traceback
-
 from celery import signals
 import boto3
 from skimage import io
@@ -15,7 +14,6 @@ import numpy as np
 import voluseg
 import h5py
 from pyspark.sql import SparkSession
-
 from config import celery
 
 
