@@ -127,11 +127,6 @@
                 <h2 class="card-title text-center mb-4">Files</h2>
                 <div id="error" class="alert alert-danger" style="display: none;"></div>
                 
-                <!-- Add refresh button -->
-                <button id="refreshButton" class="btn btn-secondary mb-3">
-                    🔄 Refresh List
-                </button>
-                
                 <h3>Input Files</h3>
                 <input type="text" class="form-control search-box" id="inputSearch" placeholder="Search input files...">
                 <div class="scrollable-list mb-4">
@@ -449,16 +444,6 @@
             }
         });
 
-        // Add handler for refresh button
-        $('#refreshButton').on('click', function() {
-            if (!$('.progress').is(':hidden')) {
-                if (!confirm('A file upload is in progress. Refreshing now may interrupt it. Are you sure you want to refresh?')) {
-                    return;
-                }
-            }
-            location.reload();
-        });
-
         // Add handler for error details button
         $(document).on('click', '.error-details-btn', function() {
             const taskId = $(this).data('task-id');
@@ -487,6 +472,16 @@
                 }
             });
         });
+
+        // Add auto-refresh for task status updates
+        function refreshPage() {
+            location.reload();
+        }
+        
+        // Refresh every 30 seconds if there are pending or processing tasks
+        if ($('.badge:contains("Pending"), .badge:contains("Processing")').length > 0) {
+            setTimeout(refreshPage, 30000);
+        }
     });
     </script>
 

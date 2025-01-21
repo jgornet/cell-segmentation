@@ -15,6 +15,7 @@ import voluseg
 import h5py
 from pyspark.sql import SparkSession
 from config import celery
+import tifffile
 
 
 # Configure logging
@@ -193,6 +194,9 @@ def generate_output(custom_parameters=None):
 
         logger.info("Starting step1_process_volumes")
         log_memory_usage()
+        input_file = parameters['input_fullname']
+        volume = tifffile.imread(input_file)
+        print(f"DEBUG: Loaded volume shape: {volume.shape}, dtype: {volume.dtype}")
         voluseg.step1_process_volumes(parameters)
         logger.info("Completed step1")
         log_memory_usage()
