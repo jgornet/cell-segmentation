@@ -151,7 +151,8 @@ def upload_form():
                            output_files=output_files, 
                            file_status=file_status,
                            running_tasks=running_tasks,
-                           celery_inspect_error=celery_inspect_error)
+                           celery_inspect_error=celery_inspect_error,
+                           config=app.config)
     except ClientError as e:
         return jsonify({'error': f'S3 list error: {str(e)}'}), 500
     except Exception as e:
@@ -260,27 +261,43 @@ def complete_multipart_upload():
     except ClientError as e:
         return jsonify({'error': f'Error completing multipart upload: {str(e)}'}), 500
 
-@app.route('/download/<bucket>/<filename>')
+@app.route('/download/<bucket>/<path:filename>')
 @auth.login_required
 @limiter.limit("10 per minute")
 def download_file(bucket, filename):
+    app.logger.info(f"Download request - Bucket: {bucket}, Filename: {filename}")
+    
     if not s3_client:
+        app.logger.error("S3 client not initialized")
         return jsonify({'error': 'S3 client not initialized. Check AWS credentials.'}), 500
     
     try:
         if bucket not in [app.config['S3_BUCKET_INPUT'], app.config['S3_BUCKET_OUTPUT']]:
+            app.logger.error(f"Invalid bucket requested: {bucket}")
             abort(404)
         
+        # Check if the file exists in S3
+        try:
+            s3_client.head_object(Bucket=bucket, Key=filename)
+        except ClientError as e:
+            if e.response['Error']['Code'] == '404':
+                app.logger.error(f"File not found in S3: {filename}")
+                abort(404)
+            else:
+                raise
+        
+        app.logger.info(f"Generating presigned URL for bucket: {bucket}, key: {filename}")
         # Generate a pre-signed URL
         url = s3_client.generate_presigned_url(
             'get_object',
             Params={
                 'Bucket': bucket,
                 'Key': filename,
-                'ResponseContentDisposition': f'attachment; filename="{quote(filename)}"'
+                'ResponseContentDisposition': f'attachment; filename="{quote(os.path.basename(filename))}"'
             },
             ExpiresIn=3600  # URL expires in 1 hour
         )
+        app.logger.info(f"Generated presigned URL: {url}")
         
         # Redirect the user to the pre-signed URL
         return redirect(url)
@@ -289,7 +306,7 @@ def download_file(bucket, filename):
         app.logger.error(f"Error generating pre-signed URL: {str(e)}")
         return jsonify({'error': f'Error generating download link: {str(e)}'}), 500
     except Exception as e:
-        app.logger.error(f"Unexpected error: {str(e)}")
+        app.logger.error(f"Unexpected error: {str(e)}\nTraceback: {traceback.format_exc()}")
         return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
 
 @app.errorhandler(500)
